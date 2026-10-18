@@ -1,0 +1,18 @@
+Alex Rivera
+Full Stack Software Engineer | React, TypeScript, Python & FastAPI | Building Scalable Systems
+[Profile Photo: Yes]
+
+About
+I am a results-driven Full Stack Software Engineer experienced in designing and delivering high-performance web applications and distributed backends. Proficient in Python, FastAPI, React, TypeScript, PostgreSQL, and Docker, with a track record of building production-grade services. Passionate about system design, clean API architecture, and collaborating on high-impact products.
+
+Experience
+Software Engineering Intern at Acme Cloud Solutions
+Summer 2023 - Present
+Developed REST API endpoints using FastAPI and PostgreSQL, serving 50k daily active users. Containerized microservices using Docker.
+
+Projects
+Readiness Copilot
+Built full-stack placement readiness platform with Python, FastAPI, and React.
+
+Skills
+Python, TypeScript, JavaScript, React, FastAPI, Node.js, PostgreSQL, Docker, Git, Redis, SQL

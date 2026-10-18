@@ -1,0 +1,14 @@
+Alex Rivera
+Vice President of Engineering | Global Tech Strategy | Enterprise Architect
+[Profile Photo: Yes]
+
+About
+Executive technology leader directing global infrastructure, enterprise architecture, and distributed engineering initiatives. Over a decade of leading world-class teams and scaling high-availability systems.
+
+Experience
+VP of Engineering at Acme Cloud Solutions
+2021 - Present
+Directed architectural strategy, budget allocation, and engineering staffing across global distributed cloud systems.
+
+Skills
+Python, FastAPI, React, TypeScript, PostgreSQL, Docker, Git, Cloud Architecture

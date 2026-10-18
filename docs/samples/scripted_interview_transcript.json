@@ -1,0 +1,650 @@
+{
+  "session_id": 1,
+  "target_role": "Full Stack Software Engineer",
+  "duration_minutes": 15,
+  "status": "completed",
+  "score": 67,
+  "feedback": {
+    "strengths": [
+      "Consistently grounds claims in real projects, repositories, and measurable outcomes."
+    ],
+    "weaknesses": [
+      "Superficial explanations of architectural principles; needs deeper technical precision.",
+      "Answers occasionally lack clear structure or rely on fragmented thoughts.",
+      "Rarely mentions why certain technical choices were made or what alternatives were rejected."
+    ],
+    "tips": [
+      "Deepen explanations of how underlying tools work under the hood (e.g. database indexing, async loops, caching layers).",
+      "Use the STAR framework (Situation, Task, Action, Result) for behavioral questions to keep answers concise and punchy.",
+      "Always explain the 'why': why did you pick this database/framework over alternatives, and what are the trade-offs?"
+    ],
+    "rubric_averages": {
+      "CRIT-TECH-DEPTH": 24.0,
+      "CRIT-CLARITY-COMM": 15.0,
+      "CRIT-GROUNDED-EXP": 20.0,
+      "CRIT-CRITICAL-THINK": 8.2
+    },
+    "reason": "completed"
+  },
+  "rubric_scores": [
+    {
+      "question_id": "Q1",
+      "question_text": "To begin our technical discussion for the Full Stack Software Engineer position: Can you explain how you design and structure scalable backend services or APIs using Docker, FastAPI, JavaScript? What key architectural principles do you prioritize for performance and reliability?",
+      "question_type": "technical",
+      "score": 72,
+      "criteria": [
+        {
+          "criterion_id": "CRIT-TECH-DEPTH",
+          "name": "Technical Accuracy & Depth",
+          "score": 28.0,
+          "max_score": 35.0,
+          "feedback": "Detected technical keywords: api, database, sql, redis."
+        },
+        {
+          "criterion_id": "CRIT-CLARITY-COMM",
+          "name": "Communication & Structure",
+          "score": 15.0,
+          "max_score": 25.0,
+          "feedback": "Response length (36 words) provided sufficient context."
+        },
+        {
+          "criterion_id": "CRIT-GROUNDED-EXP",
+          "name": "Grounded Experience & Relevance",
+          "score": 22.0,
+          "max_score": 25.0,
+          "feedback": "Referenced concrete tools and deployment steps."
+        },
+        {
+          "criterion_id": "CRIT-CRITICAL-THINK",
+          "name": "Problem-Solving & Trade-offs",
+          "score": 7.0,
+          "max_score": 15.0,
+          "feedback": "Explained reasons behind technical implementation choices."
+        }
+      ],
+      "summary": "Completed rubric evaluation based on response content."
+    },
+    {
+      "question_id": "Q2",
+      "question_text": "In your portfolio, you built 'Readiness Copilot'. Walk me through how you deployed this project from development to production. What architectural challenges did you encounter, and how did you resolve them?",
+      "question_type": "project_deep_dive",
+      "score": 78,
+      "criteria": [
+        {
+          "criterion_id": "CRIT-TECH-DEPTH",
+          "name": "Technical Accuracy & Depth",
+          "score": 28.0,
+          "max_score": 35.0,
+          "feedback": "Detected technical keywords: api, docker, react, fastapi."
+        },
+        {
+          "criterion_id": "CRIT-CLARITY-COMM",
+          "name": "Communication & Structure",
+          "score": 15.0,
+          "max_score": 25.0,
+          "feedback": "Response length (37 words) provided sufficient context."
+        },
+        {
+          "criterion_id": "CRIT-GROUNDED-EXP",
+          "name": "Grounded Experience & Relevance",
+          "score": 22.0,
+          "max_score": 25.0,
+          "feedback": "Could include more quantifiable metrics."
+        },
+        {
+          "criterion_id": "CRIT-CRITICAL-THINK",
+          "name": "Problem-Solving & Trade-offs",
+          "score": 13.0,
+          "max_score": 15.0,
+          "feedback": "Explained reasons behind technical implementation choices."
+        }
+      ],
+      "summary": "Completed rubric evaluation based on response content."
+    },
+    {
+      "question_id": "Q3",
+      "question_text": "Continuing on your technical work, looking at 'Cloud Task Queue': Walk me through your data flow, concurrency, or state management strategy. If you had to scale this system to handle 10x the traffic, what specific bottlenecks would you tackle first?",
+      "question_type": "project_deep_dive",
+      "score": 52,
+      "criteria": [
+        {
+          "criterion_id": "CRIT-TECH-DEPTH",
+          "name": "Technical Accuracy & Depth",
+          "score": 18.0,
+          "max_score": 35.0,
+          "feedback": "Detected technical keywords: redis."
+        },
+        {
+          "criterion_id": "CRIT-CLARITY-COMM",
+          "name": "Communication & Structure",
+          "score": 15.0,
+          "max_score": 25.0,
+          "feedback": "Response length (25 words) provided sufficient context."
+        },
+        {
+          "criterion_id": "CRIT-GROUNDED-EXP",
+          "name": "Grounded Experience & Relevance",
+          "score": 12.0,
+          "max_score": 25.0,
+          "feedback": "Could include more quantifiable metrics."
+        },
+        {
+          "criterion_id": "CRIT-CRITICAL-THINK",
+          "name": "Problem-Solving & Trade-offs",
+          "score": 7.0,
+          "max_score": 15.0,
+          "feedback": "Explained reasons behind technical implementation choices."
+        }
+      ],
+      "summary": "Completed rubric evaluation based on response content."
+    },
+    {
+      "question_id": "Q4",
+      "question_text": "When building high-concurrency features with FastAPI, how do you handle asynchronous operations, error boundaries, and database query optimization to prevent latency spikes?",
+      "question_type": "technical",
+      "score": 72,
+      "criteria": [
+        {
+          "criterion_id": "CRIT-TECH-DEPTH",
+          "name": "Technical Accuracy & Depth",
+          "score": 28.0,
+          "max_score": 35.0,
+          "feedback": "Detected technical keywords: database, redis, latency, python."
+        },
+        {
+          "criterion_id": "CRIT-CLARITY-COMM",
+          "name": "Communication & Structure",
+          "score": 15.0,
+          "max_score": 25.0,
+          "feedback": "Response length (25 words) provided sufficient context."
+        },
+        {
+          "criterion_id": "CRIT-GROUNDED-EXP",
+          "name": "Grounded Experience & Relevance",
+          "score": 22.0,
+          "max_score": 25.0,
+          "feedback": "Could include more quantifiable metrics."
+        },
+        {
+          "criterion_id": "CRIT-CRITICAL-THINK",
+          "name": "Problem-Solving & Trade-offs",
+          "score": 7.0,
+          "max_score": 15.0,
+          "feedback": "Explained reasons behind technical implementation choices."
+        }
+      ],
+      "summary": "Completed rubric evaluation based on response content."
+    },
+    {
+      "question_id": "Q5",
+      "question_text": "Tell me about a challenging situation where you faced a tight project deadline, unexpected technical roadblock, or team disagreement. How did you handle the situation, and what was the outcome? (Feel free to use the STAR method).",
+      "question_type": "hr_behavioral",
+      "score": 62,
+      "criteria": [
+        {
+          "criterion_id": "CRIT-TECH-DEPTH",
+          "name": "Technical Accuracy & Depth",
+          "score": 18.0,
+          "max_score": 35.0,
+          "feedback": "Detected technical keywords: database, sql."
+        },
+        {
+          "criterion_id": "CRIT-CLARITY-COMM",
+          "name": "Communication & Structure",
+          "score": 15.0,
+          "max_score": 25.0,
+          "feedback": "Response length (32 words) provided sufficient context."
+        },
+        {
+          "criterion_id": "CRIT-GROUNDED-EXP",
+          "name": "Grounded Experience & Relevance",
+          "score": 22.0,
+          "max_score": 25.0,
+          "feedback": "Referenced concrete tools and deployment steps."
+        },
+        {
+          "criterion_id": "CRIT-CRITICAL-THINK",
+          "name": "Problem-Solving & Trade-offs",
+          "score": 7.0,
+          "max_score": 15.0,
+          "feedback": "Explained reasons behind technical implementation choices."
+        }
+      ],
+      "summary": "Completed rubric evaluation based on response content."
+    }
+  ],
+  "messages": [
+    {
+      "role": "interviewer",
+      "content": "Hello! Welcome to your mock interview simulation for the Full Stack Software Engineer position. We have 15 minutes allocated today. Let's get started:\n\nTo begin our technical discussion for the Full Stack Software Engineer position: Can you explain how you design and structure scalable backend services or APIs using Docker, FastAPI, JavaScript? What key architectural principles do you prioritize for performance and reliability?",
+      "timestamp": "2026-10-16T17:27:05.442628",
+      "question_id": "Q1"
+    },
+    {
+      "role": "student",
+      "content": "In Python and FastAPI, I structure services using modular routers and dependency injection for database sessions. To scale, I implement connection pooling in SQLAlchemy and Redis caching for read-heavy query paths, reducing response times below 50ms.",
+      "timestamp": "2026-10-16T17:27:05.446225",
+      "question_id": "Q1",
+      "evaluation": {
+        "score": 72,
+        "criteria": [
+          {
+            "criterion_id": "CRIT-TECH-DEPTH",
+            "name": "Technical Accuracy & Depth",
+            "score": 28.0,
+            "max_score": 35.0,
+            "feedback": "Detected technical keywords: api, database, sql, redis."
+          },
+          {
+            "criterion_id": "CRIT-CLARITY-COMM",
+            "name": "Communication & Structure",
+            "score": 15.0,
+            "max_score": 25.0,
+            "feedback": "Response length (36 words) provided sufficient context."
+          },
+          {
+            "criterion_id": "CRIT-GROUNDED-EXP",
+            "name": "Grounded Experience & Relevance",
+            "score": 22.0,
+            "max_score": 25.0,
+            "feedback": "Referenced concrete tools and deployment steps."
+          },
+          {
+            "criterion_id": "CRIT-CRITICAL-THINK",
+            "name": "Problem-Solving & Trade-offs",
+            "score": 7.0,
+            "max_score": 15.0,
+            "feedback": "Explained reasons behind technical implementation choices."
+          }
+        ],
+        "summary": "Completed rubric evaluation based on response content.",
+        "adaptive_followup": "Could you walk me through the trade-offs you considered when implementing this?",
+        "is_weak": false
+      }
+    },
+    {
+      "role": "interviewer",
+      "content": "Great explanation. Moving to the next area: \n\nIn your portfolio, you built 'Readiness Copilot'. Walk me through how you deployed this project from development to production. What architectural challenges did you encounter, and how did you resolve them?",
+      "timestamp": "2026-10-16T17:27:06.301927",
+      "question_id": "Q2",
+      "is_ended": false,
+      "evaluation": {
+        "score": 72,
+        "criteria": [
+          {
+            "criterion_id": "CRIT-TECH-DEPTH",
+            "name": "Technical Accuracy & Depth",
+            "score": 28.0,
+            "max_score": 35.0,
+            "feedback": "Detected technical keywords: api, database, sql, redis."
+          },
+          {
+            "criterion_id": "CRIT-CLARITY-COMM",
+            "name": "Communication & Structure",
+            "score": 15.0,
+            "max_score": 25.0,
+            "feedback": "Response length (36 words) provided sufficient context."
+          },
+          {
+            "criterion_id": "CRIT-GROUNDED-EXP",
+            "name": "Grounded Experience & Relevance",
+            "score": 22.0,
+            "max_score": 25.0,
+            "feedback": "Referenced concrete tools and deployment steps."
+          },
+          {
+            "criterion_id": "CRIT-CRITICAL-THINK",
+            "name": "Problem-Solving & Trade-offs",
+            "score": 7.0,
+            "max_score": 15.0,
+            "feedback": "Explained reasons behind technical implementation choices."
+          }
+        ],
+        "summary": "Completed rubric evaluation based on response content.",
+        "adaptive_followup": "Could you walk me through the trade-offs you considered when implementing this?",
+        "is_weak": false
+      }
+    },
+    {
+      "role": "student",
+      "content": "For Readiness Copilot, I containerized both the FastAPI backend and React frontend with Docker and deployed to AWS ECS. A key challenge was handling simultaneous PDF parsing, which I resolved by offloading PyMuPDF processing to worker threads.",
+      "timestamp": "2026-10-16T17:27:06.309904",
+      "question_id": "Q2",
+      "evaluation": {
+        "score": 78,
+        "criteria": [
+          {
+            "criterion_id": "CRIT-TECH-DEPTH",
+            "name": "Technical Accuracy & Depth",
+            "score": 28.0,
+            "max_score": 35.0,
+            "feedback": "Detected technical keywords: api, docker, react, fastapi."
+          },
+          {
+            "criterion_id": "CRIT-CLARITY-COMM",
+            "name": "Communication & Structure",
+            "score": 15.0,
+            "max_score": 25.0,
+            "feedback": "Response length (37 words) provided sufficient context."
+          },
+          {
+            "criterion_id": "CRIT-GROUNDED-EXP",
+            "name": "Grounded Experience & Relevance",
+            "score": 22.0,
+            "max_score": 25.0,
+            "feedback": "Could include more quantifiable metrics."
+          },
+          {
+            "criterion_id": "CRIT-CRITICAL-THINK",
+            "name": "Problem-Solving & Trade-offs",
+            "score": 13.0,
+            "max_score": 15.0,
+            "feedback": "Explained reasons behind technical implementation choices."
+          }
+        ],
+        "summary": "Completed rubric evaluation based on response content.",
+        "adaptive_followup": "Could you walk me through the trade-offs you considered when implementing this?",
+        "is_weak": false
+      }
+    },
+    {
+      "role": "interviewer",
+      "content": "Great explanation. Moving to the next area: \n\nContinuing on your technical work, looking at 'Cloud Task Queue': Walk me through your data flow, concurrency, or state management strategy. If you had to scale this system to handle 10x the traffic, what specific bottlenecks would you tackle first?",
+      "timestamp": "2026-10-16T17:27:06.942857",
+      "question_id": "Q3",
+      "is_ended": false,
+      "evaluation": {
+        "score": 78,
+        "criteria": [
+          {
+            "criterion_id": "CRIT-TECH-DEPTH",
+            "name": "Technical Accuracy & Depth",
+            "score": 28.0,
+            "max_score": 35.0,
+            "feedback": "Detected technical keywords: api, docker, react, fastapi."
+          },
+          {
+            "criterion_id": "CRIT-CLARITY-COMM",
+            "name": "Communication & Structure",
+            "score": 15.0,
+            "max_score": 25.0,
+            "feedback": "Response length (37 words) provided sufficient context."
+          },
+          {
+            "criterion_id": "CRIT-GROUNDED-EXP",
+            "name": "Grounded Experience & Relevance",
+            "score": 22.0,
+            "max_score": 25.0,
+            "feedback": "Could include more quantifiable metrics."
+          },
+          {
+            "criterion_id": "CRIT-CRITICAL-THINK",
+            "name": "Problem-Solving & Trade-offs",
+            "score": 13.0,
+            "max_score": 15.0,
+            "feedback": "Explained reasons behind technical implementation choices."
+          }
+        ],
+        "summary": "Completed rubric evaluation based on response content.",
+        "adaptive_followup": "Could you walk me through the trade-offs you considered when implementing this?",
+        "is_weak": false
+      }
+    },
+    {
+      "role": "student",
+      "content": "In my Distributed Task Queue project, I implemented worker pools listening to Redis queues with graceful shutdown handling and idempotency keys to ensure at-least-once delivery.",
+      "timestamp": "2026-10-16T17:27:06.947735",
+      "question_id": "Q3",
+      "evaluation": {
+        "score": 52,
+        "criteria": [
+          {
+            "criterion_id": "CRIT-TECH-DEPTH",
+            "name": "Technical Accuracy & Depth",
+            "score": 18.0,
+            "max_score": 35.0,
+            "feedback": "Detected technical keywords: redis."
+          },
+          {
+            "criterion_id": "CRIT-CLARITY-COMM",
+            "name": "Communication & Structure",
+            "score": 15.0,
+            "max_score": 25.0,
+            "feedback": "Response length (25 words) provided sufficient context."
+          },
+          {
+            "criterion_id": "CRIT-GROUNDED-EXP",
+            "name": "Grounded Experience & Relevance",
+            "score": 12.0,
+            "max_score": 25.0,
+            "feedback": "Could include more quantifiable metrics."
+          },
+          {
+            "criterion_id": "CRIT-CRITICAL-THINK",
+            "name": "Problem-Solving & Trade-offs",
+            "score": 7.0,
+            "max_score": 15.0,
+            "feedback": "Explained reasons behind technical implementation choices."
+          }
+        ],
+        "summary": "Completed rubric evaluation based on response content.",
+        "adaptive_followup": "Could you walk me through the trade-offs you considered when implementing this?",
+        "is_weak": true
+      }
+    },
+    {
+      "role": "interviewer",
+      "content": "Thanks for that initial response. Let's explore your practical experience a bit further: \n\nWhen building high-concurrency features with FastAPI, how do you handle asynchronous operations, error boundaries, and database query optimization to prevent latency spikes?",
+      "timestamp": "2026-10-16T17:27:07.497392",
+      "question_id": "Q4",
+      "is_ended": false,
+      "evaluation": {
+        "score": 52,
+        "criteria": [
+          {
+            "criterion_id": "CRIT-TECH-DEPTH",
+            "name": "Technical Accuracy & Depth",
+            "score": 18.0,
+            "max_score": 35.0,
+            "feedback": "Detected technical keywords: redis."
+          },
+          {
+            "criterion_id": "CRIT-CLARITY-COMM",
+            "name": "Communication & Structure",
+            "score": 15.0,
+            "max_score": 25.0,
+            "feedback": "Response length (25 words) provided sufficient context."
+          },
+          {
+            "criterion_id": "CRIT-GROUNDED-EXP",
+            "name": "Grounded Experience & Relevance",
+            "score": 12.0,
+            "max_score": 25.0,
+            "feedback": "Could include more quantifiable metrics."
+          },
+          {
+            "criterion_id": "CRIT-CRITICAL-THINK",
+            "name": "Problem-Solving & Trade-offs",
+            "score": 7.0,
+            "max_score": 15.0,
+            "feedback": "Explained reasons behind technical implementation choices."
+          }
+        ],
+        "summary": "Completed rubric evaluation based on response content.",
+        "adaptive_followup": "Could you walk me through the trade-offs you considered when implementing this?",
+        "is_weak": true
+      }
+    },
+    {
+      "role": "student",
+      "content": "With async Python, I use asyncio.gather for concurrent I/O operations, set strict database query timeouts, and add Redis caching to prevent latency spikes under load.",
+      "timestamp": "2026-10-16T17:27:07.501532",
+      "question_id": "Q4",
+      "evaluation": {
+        "score": 72,
+        "criteria": [
+          {
+            "criterion_id": "CRIT-TECH-DEPTH",
+            "name": "Technical Accuracy & Depth",
+            "score": 28.0,
+            "max_score": 35.0,
+            "feedback": "Detected technical keywords: database, redis, latency, python."
+          },
+          {
+            "criterion_id": "CRIT-CLARITY-COMM",
+            "name": "Communication & Structure",
+            "score": 15.0,
+            "max_score": 25.0,
+            "feedback": "Response length (25 words) provided sufficient context."
+          },
+          {
+            "criterion_id": "CRIT-GROUNDED-EXP",
+            "name": "Grounded Experience & Relevance",
+            "score": 22.0,
+            "max_score": 25.0,
+            "feedback": "Could include more quantifiable metrics."
+          },
+          {
+            "criterion_id": "CRIT-CRITICAL-THINK",
+            "name": "Problem-Solving & Trade-offs",
+            "score": 7.0,
+            "max_score": 15.0,
+            "feedback": "Explained reasons behind technical implementation choices."
+          }
+        ],
+        "summary": "Completed rubric evaluation based on response content.",
+        "adaptive_followup": "Could you walk me through the trade-offs you considered when implementing this?",
+        "is_weak": false
+      }
+    },
+    {
+      "role": "interviewer",
+      "content": "Great explanation. Moving to the next area: \n\nTell me about a challenging situation where you faced a tight project deadline, unexpected technical roadblock, or team disagreement. How did you handle the situation, and what was the outcome? (Feel free to use the STAR method).",
+      "timestamp": "2026-10-16T17:27:08.091813",
+      "question_id": "Q5",
+      "is_ended": false,
+      "evaluation": {
+        "score": 72,
+        "criteria": [
+          {
+            "criterion_id": "CRIT-TECH-DEPTH",
+            "name": "Technical Accuracy & Depth",
+            "score": 28.0,
+            "max_score": 35.0,
+            "feedback": "Detected technical keywords: database, redis, latency, python."
+          },
+          {
+            "criterion_id": "CRIT-CLARITY-COMM",
+            "name": "Communication & Structure",
+            "score": 15.0,
+            "max_score": 25.0,
+            "feedback": "Response length (25 words) provided sufficient context."
+          },
+          {
+            "criterion_id": "CRIT-GROUNDED-EXP",
+            "name": "Grounded Experience & Relevance",
+            "score": 22.0,
+            "max_score": 25.0,
+            "feedback": "Could include more quantifiable metrics."
+          },
+          {
+            "criterion_id": "CRIT-CRITICAL-THINK",
+            "name": "Problem-Solving & Trade-offs",
+            "score": 7.0,
+            "max_score": 15.0,
+            "feedback": "Explained reasons behind technical implementation choices."
+          }
+        ],
+        "summary": "Completed rubric evaluation based on response content.",
+        "adaptive_followup": "Could you walk me through the trade-offs you considered when implementing this?",
+        "is_weak": false
+      }
+    },
+    {
+      "role": "student",
+      "content": "When preparing for launch, our team faced a SQLite database locking bottleneck. Using the STAR framework, I identified concurrent write contention, enabled WAL mode, and eliminated locks for 120 concurrent simulated users.",
+      "timestamp": "2026-10-16T17:27:08.102237",
+      "question_id": "Q5",
+      "evaluation": {
+        "score": 62,
+        "criteria": [
+          {
+            "criterion_id": "CRIT-TECH-DEPTH",
+            "name": "Technical Accuracy & Depth",
+            "score": 18.0,
+            "max_score": 35.0,
+            "feedback": "Detected technical keywords: database, sql."
+          },
+          {
+            "criterion_id": "CRIT-CLARITY-COMM",
+            "name": "Communication & Structure",
+            "score": 15.0,
+            "max_score": 25.0,
+            "feedback": "Response length (32 words) provided sufficient context."
+          },
+          {
+            "criterion_id": "CRIT-GROUNDED-EXP",
+            "name": "Grounded Experience & Relevance",
+            "score": 22.0,
+            "max_score": 25.0,
+            "feedback": "Referenced concrete tools and deployment steps."
+          },
+          {
+            "criterion_id": "CRIT-CRITICAL-THINK",
+            "name": "Problem-Solving & Trade-offs",
+            "score": 7.0,
+            "max_score": 15.0,
+            "feedback": "Explained reasons behind technical implementation choices."
+          }
+        ],
+        "summary": "Completed rubric evaluation based on response content.",
+        "adaptive_followup": "Could you walk me through the trade-offs you considered when implementing this?",
+        "is_weak": false
+      }
+    },
+    {
+      "role": "interviewer",
+      "content": "Thank you for sharing those insights! That completes all our questions for this interview. Let me summarize your results and placement readiness score.",
+      "timestamp": "2026-10-16T17:27:08.867439",
+      "is_ended": true,
+      "evaluation": {
+        "score": 62,
+        "criteria": [
+          {
+            "criterion_id": "CRIT-TECH-DEPTH",
+            "name": "Technical Accuracy & Depth",
+            "score": 18.0,
+            "max_score": 35.0,
+            "feedback": "Detected technical keywords: database, sql."
+          },
+          {
+            "criterion_id": "CRIT-CLARITY-COMM",
+            "name": "Communication & Structure",
+            "score": 15.0,
+            "max_score": 25.0,
+            "feedback": "Response length (32 words) provided sufficient context."
+          },
+          {
+            "criterion_id": "CRIT-GROUNDED-EXP",
+            "name": "Grounded Experience & Relevance",
+            "score": 22.0,
+            "max_score": 25.0,
+            "feedback": "Referenced concrete tools and deployment steps."
+          },
+          {
+            "criterion_id": "CRIT-CRITICAL-THINK",
+            "name": "Problem-Solving & Trade-offs",
+            "score": 7.0,
+            "max_score": 15.0,
+            "feedback": "Explained reasons behind technical implementation choices."
+          }
+        ],
+        "summary": "Completed rubric evaluation based on response content.",
+        "adaptive_followup": "Could you walk me through the trade-offs you considered when implementing this?",
+        "is_weak": false
+      }
+    }
+  ],
+  "recorded_at": "2026-10-16T17:27:08.869862",
+  "provider": "scripted_benchmark"
+}

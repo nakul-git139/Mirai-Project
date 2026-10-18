@@ -1,0 +1,12 @@
+Jordan Doe
+Student at MSOT
+[Profile Photo: Missing]
+
+About
+I like coding and web stuff.
+
+Experience
+Coding Club Member at University
+
+Skills
+HTML, CSS
