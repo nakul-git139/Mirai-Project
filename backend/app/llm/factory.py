@@ -24,7 +24,18 @@ def get_llm_adapter(
         settings.update(settings_override)
 
     active_provider = (provider or settings.get("provider") or "ollama").lower()
-    active_model = model or settings.get("model") or DEFAULT_MODELS.get(active_provider, "")
+    saved_provider = settings.get("provider", "").lower()
+
+    if model:
+        active_model = model
+    elif provider and provider.lower() != saved_provider:
+        active_model = DEFAULT_MODELS.get(active_provider, "")
+    else:
+        active_model = settings.get("model") or DEFAULT_MODELS.get(active_provider, "")
+
+    # Safety check: if provider is ollama and active_model is an openai/claude/gemini model, fallback to default ollama model
+    if active_provider == "ollama" and ("gpt" in active_model.lower() or "claude" in active_model.lower() or "gemini" in active_model.lower()):
+        active_model = DEFAULT_MODELS.get("ollama", "qwen2.5:3b")
 
     if active_provider == "ollama":
         base_url = settings.get("ollama_base_url", "http://localhost:11434")

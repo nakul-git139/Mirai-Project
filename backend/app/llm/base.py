@@ -17,6 +17,21 @@ class LLMResponse(BaseModel):
     usage: Optional[Dict[str, Any]] = None
 
 
+class LLMProviderError(Exception):
+    """Base error for LLM provider exceptions."""
+    pass
+
+
+class LLMProviderRateLimitError(LLMProviderError):
+    """Raised when hosted or local provider hits rate limits (HTTP 429)."""
+    pass
+
+
+class LLMProviderTimeoutError(LLMProviderError):
+    """Raised when provider request times out after all retry attempts."""
+    pass
+
+
 class BaseLLMAdapter(ABC):
     """Abstract interface for all LLM provider adapters."""
 

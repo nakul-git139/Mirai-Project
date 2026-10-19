@@ -1,5 +1,7 @@
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
+from app.auth import require_admin
+from app.models import User
 from app.schemas import (
     SettingsUpdate,
     SettingsResponse,
@@ -44,6 +46,12 @@ def update_settings(updates: SettingsUpdate):
         current["claude_api_key"] = updates.claude_api_key
     if updates.gemini_api_key is not None:
         current["gemini_api_key"] = updates.gemini_api_key
+    if updates.concurrency_limits is not None:
+        if "concurrency_limits" not in current or not isinstance(current["concurrency_limits"], dict):
+            current["concurrency_limits"] = {}
+        current["concurrency_limits"].update(updates.concurrency_limits)
+    if updates.rate_limit_reviews_per_hour is not None:
+        current["rate_limit_reviews_per_hour"] = updates.rate_limit_reviews_per_hour
 
     save_raw_settings(current)
     return get_public_settings()
@@ -73,3 +81,10 @@ def test_connection(req: ConnectionTestRequest):
             model=model or "unknown",
             message=str(exc),
         )
+
+
+@router.get("/timing-logs")
+def get_timing_logs(limit: int = 50, current_admin: User = Depends(require_admin)):
+    """Retrieve recent LLM execution timing and token logs for performance visibility (admin-only)."""
+    from app.services.timing_logger import get_recent_timing_logs
+    return get_recent_timing_logs(limit=limit)

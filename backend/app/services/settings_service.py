@@ -1,23 +1,36 @@
 from __future__ import annotations
 import json
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+from app import config
 from app.config import SETTINGS_FILE_PATH
 from app.logging_config import register_secret_for_redaction
 
-DEFAULT_SETTINGS: Dict[str, Any] = {
-    "provider": "ollama",
-    "model": "llama3.2",
-    "ollama_base_url": "http://localhost:11434",
-    "openai_api_key": "",
-    "claude_api_key": "",
-    "gemini_api_key": "",
-    "github_token": "",
-}
+
+def get_default_settings() -> Dict[str, Any]:
+    base_url = os.environ.get("OLLAMA_BASE_URL", config.DEFAULT_OLLAMA_BASE_URL)
+    model = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")
+    provider = os.environ.get("DEFAULT_LLM_PROVIDER") or os.environ.get("LLM_PROVIDER", "ollama")
+    return {
+        "provider": provider,
+        "model": model,
+        "ollama_base_url": base_url,
+        "openai_api_key": os.environ.get("OPENAI_API_KEY", ""),
+        "claude_api_key": os.environ.get("CLAUDE_API_KEY", ""),
+        "gemini_api_key": os.environ.get("GEMINI_API_KEY", ""),
+        "github_token": os.environ.get("GITHUB_TOKEN", ""),
+        "concurrency_limits": config.DEFAULT_CONCURRENCY_LIMITS.copy(),
+        "rate_limit_reviews_per_hour": config.DEFAULT_RATE_LIMIT_REVIEWS_PER_HOUR,
+        "rate_limit_window_seconds": config.DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
+    }
+
+
+DEFAULT_SETTINGS: Dict[str, Any] = get_default_settings()
 
 DEFAULT_MODELS: Dict[str, str] = {
-    "ollama": "llama3.2",
+    "ollama": os.environ.get("OLLAMA_MODEL", "qwen2.5:3b"),
     "openai": "gpt-4o-mini",
     "claude": "claude-3-5-sonnet-20241022",
     "gemini": "gemini-1.5-flash",
@@ -29,9 +42,10 @@ AVAILABLE_PROVIDERS = ["ollama", "openai", "claude", "gemini", "mock"]
 
 def load_raw_settings() -> Dict[str, Any]:
     """Load settings from local JSON file. Creates file with defaults if absent."""
+    defaults = get_default_settings()
     if not SETTINGS_FILE_PATH.exists():
-        save_raw_settings(DEFAULT_SETTINGS)
-        return DEFAULT_SETTINGS.copy()
+        save_raw_settings(defaults)
+        return defaults.copy()
 
     try:
         with open(SETTINGS_FILE_PATH, "r", encoding="utf-8") as f:
@@ -39,8 +53,10 @@ def load_raw_settings() -> Dict[str, Any]:
     except Exception:
         data = {}
 
-    merged = DEFAULT_SETTINGS.copy()
+    merged = defaults.copy()
     merged.update(data)
+    if os.environ.get("LLM_PROVIDER"):
+        merged["provider"] = os.environ.get("LLM_PROVIDER")
 
     # Register any present keys for logging redaction
     for key in ("openai_api_key", "claude_api_key", "gemini_api_key", "github_token"):
@@ -72,13 +88,16 @@ def get_public_settings() -> Dict[str, Any]:
     raw = load_raw_settings()
     return {
         "provider": raw.get("provider", "ollama"),
-        "model": raw.get("model", "llama3.2"),
-        "ollama_base_url": raw.get("ollama_base_url", "http://localhost:11434"),
+        "model": raw.get("model", "qwen2.5:3b"),
+        "ollama_base_url": raw.get("ollama_base_url", config.DEFAULT_OLLAMA_BASE_URL),
         "has_openai_key": bool(raw.get("openai_api_key")),
         "has_claude_key": bool(raw.get("claude_api_key")),
         "has_gemini_key": bool(raw.get("gemini_api_key")),
         "has_github_token": bool(raw.get("github_token")),
         "available_providers": AVAILABLE_PROVIDERS,
         "default_models": DEFAULT_MODELS,
+        "concurrency_limits": raw.get("concurrency_limits", config.DEFAULT_CONCURRENCY_LIMITS),
+        "rate_limit_reviews_per_hour": raw.get("rate_limit_reviews_per_hour", config.DEFAULT_RATE_LIMIT_REVIEWS_PER_HOUR),
+        "enable_mock_interview": getattr(config, "ENABLE_MOCK_INTERVIEW", False),
     }
 

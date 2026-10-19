@@ -584,27 +584,33 @@ async def perform_llm_code_review(files_map: Dict[str, str], repo_name: str) -> 
             fix="Structure application logic into distinct, single-responsibility modules.",
         )
 
-    # Pick top 2 most prominent source files
+    # Select up to 2 key candidate source files
     candidate_paths = [p for p in files_map if any(p.endswith(ext) for ext in (".py", ".js", ".ts", ".jsx", ".tsx", ".go"))]
     if not candidate_paths:
         candidate_paths = list(files_map.keys())
 
+    # Limit to top 2 files and strictly truncate lines & length to keep prompts small and fast on CPU
     selected_files = candidate_paths[:2]
     code_snippets = []
     for p in selected_files:
-        lines = files_map[p].splitlines()[:150]
-        code_snippets.append(f"--- File: {p} ---\n" + "\n".join(lines))
-    combined_code = "\n\n".join(code_snippets)
+        raw_content = files_map[p]
+        # Keep max 50 lines and 1,200 chars per file
+        lines = raw_content.splitlines()[:50]
+        truncated_text = "\n".join(lines)[:1200]
+        code_snippets.append(f"--- File: {p} ---\n{truncated_text}")
+    combined_code = "\n\n".join(code_snippets)[:2200]
 
     provider = get_llm_adapter()
 
     system_prompt = (
-        "You are a Senior Principal Software Engineer and Technical Placement Evaluator. "
-        "Review the provided candidate code snippet for readability, modular architecture, error handling, and obvious bugs. "
-        "Return structured JSON matching the requested schema. "
-        "Your recommendation must be concrete, specific, and actionable."
+        "You are a Senior Technical Placement Evaluator. Review the provided candidate code snippet. "
+        "Judge whether the code has sound structure without fatal syntax or logic errors. "
+        "Mark passed=true for clean, readable code even if simple (do not fail code merely for missing docstrings or small stubs). "
+        "Mark passed=false ONLY if there are severe bugs, syntax errors, or deeply unreadable/convoluted code. "
+        "Return compact JSON. Keep positive_notes and issues to brief bullet phrases (<= 15 words each). "
+        "Make specific_fix concrete and concise."
     )
-    user_prompt = f"Evaluate the following code from repository '{repo_name}':\n\n{combined_code}"
+    user_prompt = f"Evaluate this code from '{repo_name}':\n\n{combined_code}\n\nNote: Mark passed=true if the syntax is valid with no crash errors."
 
     try:
         review_data: CodeReviewLLMSchema = await agenerate_structured_output(
@@ -613,7 +619,11 @@ async def perform_llm_code_review(files_map: Dict[str, str], repo_name: str) -> 
             schema=CodeReviewLLMSchema,
             system_prompt=system_prompt,
             max_retries=2,
+            temperature=0.0,
+            feature="github_code_review",
+            num_predict=220,
         )
+
 
         evidence_str = f"Code quality evaluated: Readability is {review_data.readability_rating}."
         if review_data.positive_notes:

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, Profile, UploadedFile, ReviewResult
 from app.auth import get_current_user
-from app.schemas import ResumeReviewResponse
+from app.schemas import ResumeReviewResponse, BackgroundJobResponse
 from app.services.resume_reviewer import review_resume, render_resume_preview_image
 
 logger = logging.getLogger(__name__)
@@ -130,6 +130,72 @@ async def trigger_resume_review(
         summary=review_record.summary,
         checks=review_record.checks,
         created_at=review_record.created_at,
+    )
+
+
+@router.post("/resume/async", response_model=BackgroundJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def trigger_resume_review_async(
+    file: Optional[UploadFile] = File(None),
+    provider: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Asynchronously triggers a placement readiness review of the student's resume as a background job.
+    Enforces student consent, per-student hourly rate limits, and per-provider concurrency slots.
+    """
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile or not profile.consent_given:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Consent is required before reviewing your resume. Please grant consent first in the Profile tab.",
+        )
+
+    payload: Dict[str, Any] = {"user_id": current_user.id}
+    if file is not None:
+        content = await file.read()
+        import base64
+        payload["file_b64"] = base64.b64encode(content).decode("ascii")
+        payload["filename"] = file.filename or "resume.pdf"
+    if provider:
+        payload["provider"] = provider
+
+    from app.services.job_queue import job_queue_service, RateLimitExceededError
+    from app.services.job_dispatchers import run_resume_review
+
+    try:
+        job = job_queue_service.create_job(
+            user_id=current_user.id,
+            task_type="resume_review",
+            payload=payload,
+            provider=provider,
+            db=db,
+        )
+    except RateLimitExceededError as rle:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": rle.message,
+                "retry_after": rle.retry_after,
+            },
+            headers={"Retry-After": str(rle.retry_after)},
+        )
+
+    job_queue_service.enqueue_and_dispatch(job.id, run_resume_review, job.provider)
+    pos = job_queue_service.calculate_queue_position(job.id, job.provider, db)
+
+    return BackgroundJobResponse(
+        id=job.id,
+        user_id=job.user_id,
+        task_type=job.task_type,
+        provider=job.provider,
+        status=job.status,
+        queue_position=pos,
+        result=job.result,
+        error_message=job.error_message,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
     )
 
 

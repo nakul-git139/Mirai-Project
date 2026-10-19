@@ -5,6 +5,7 @@ import logging
 import asyncio
 from typing import Dict, Any, List, Optional
 from pathlib import Path
+from pydantic import BaseModel, Field
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
 
 logger = logging.getLogger(__name__)
@@ -206,3 +207,65 @@ def re_tokens(text: str) -> List[str]:
     # Exclude common stopwords
     stopwords = {"and", "the", "for", "with", "this", "that", "from", "your", "app", "web", "http", "https"}
     return [t for t in tokens if t not in stopwords]
+
+
+def generate_live_link_summary(
+    url: str,
+    page_title: str,
+    headings: List[str],
+    status_code: int,
+    console_errors: List[str],
+    adapter: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """
+    Generates a concise 1-sentence verification summary of live link health.
+    Uses LLM if available with small num_predict (80) or deterministic rule fallback.
+    """
+    if adapter is None:
+        try:
+            from app.llm.factory import get_llm_adapter
+            adapter = get_llm_adapter()
+        except Exception:
+            adapter = None
+
+    class LiveLinkSummarySchema(BaseModel):
+        summary: str = Field(description="1-sentence factual summary of live site status")
+        status_assessment: str = Field(description="production_ready, minor_issues, or unreachable")
+
+    if adapter is not None:
+        try:
+            from app.llm.structured import generate_structured_output
+            headings_text = ", ".join(headings[:5]) if headings else "None"
+            prompt = (
+                f"URL: {url}\nTitle: {page_title}\nHTTP: {status_code}\nHeadings: {headings_text}\n"
+                f"Console Errors: {len(console_errors)}"
+            )
+            res: LiveLinkSummarySchema = generate_structured_output(
+                adapter=adapter,
+                prompt=f"Summarize live deployment state:\n{prompt}",
+                schema=LiveLinkSummarySchema,
+                system_prompt="You are a Web Deployment Verification Agent. Return compact JSON. Keep summary to 1 sentence.",
+                max_retries=2,
+                temperature=0.0,
+                feature="live_link_summary",
+                num_predict=80,
+            )
+            return {
+                "summary": res.summary,
+                "status_assessment": res.status_assessment,
+            }
+        except Exception as e:
+            logger.debug(f"LLM live link summary fallback: {e}")
+
+    # Fallback
+    if status_code == 200 and not console_errors:
+        assessment = "production_ready"
+        summary = f"Live application at '{url}' loaded successfully (HTTP 200) with title '{page_title}' and 0 console errors."
+    else:
+        assessment = "minor_issues" if status_code == 200 else "unreachable"
+        summary = f"Live site at '{url}' returned HTTP {status_code} with {len(console_errors)} console errors."
+
+    return {
+        "summary": summary,
+        "status_assessment": assessment,
+    }

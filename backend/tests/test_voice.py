@@ -15,6 +15,12 @@ from app.services.voice_service import (
 )
 
 
+@pytest.fixture(autouse=True)
+def enable_interview_flag(monkeypatch):
+    """Enables interview flag by default for voice tests calling interview endpoints."""
+    monkeypatch.setattr("app.config.ENABLE_MOCK_INTERVIEW", True)
+
+
 def _generate_test_speech_audio(text: str, filename: str) -> str:
     """Generates a real 16kHz WAV audio file with spoken speech using macOS say tool."""
     os.makedirs("backend/data", exist_ok=True)

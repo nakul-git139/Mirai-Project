@@ -15,6 +15,7 @@ from app.schemas import (
     BooleanQueryResponse,
     SourcesConfigRequest,
     OpenSearchLinks,
+    BackgroundJobResponse,
 )
 from app.services.job_discovery import (
     job_discovery_service,
@@ -206,3 +207,56 @@ async def test_source(
             "latency_ms": latency_ms,
             "count": 0,
         }
+
+
+@router.post("/match/async", response_model=BackgroundJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def trigger_job_match_async(
+    payload: Dict[str, Any],
+    provider: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    """
+    Asynchronously triggers structured job match explanation as a background job.
+    """
+    user_id = current_user.id if current_user else 1
+    job_payload = dict(payload)
+    job_payload["user_id"] = user_id
+    if provider:
+        job_payload["provider"] = provider
+
+    from app.services.job_queue import job_queue_service, RateLimitExceededError
+    from app.services.job_dispatchers import run_job_match
+
+    try:
+        job = job_queue_service.create_job(
+            user_id=user_id,
+            task_type="job_match",
+            payload=job_payload,
+            provider=provider,
+            db=db,
+        )
+    except RateLimitExceededError as rle:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"message": rle.message, "retry_after": rle.retry_after},
+            headers={"Retry-After": str(rle.retry_after)},
+        )
+
+    job_queue_service.enqueue_and_dispatch(job.id, run_job_match, job.provider)
+    pos = job_queue_service.calculate_queue_position(job.id, job.provider, db)
+
+    return BackgroundJobResponse(
+        id=job.id,
+        user_id=job.user_id,
+        task_type=job.task_type,
+        provider=job.provider,
+        status=job.status,
+        queue_position=pos,
+        result=job.result,
+        error_message=job.error_message,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+    )
+

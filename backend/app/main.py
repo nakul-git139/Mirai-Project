@@ -20,6 +20,7 @@ from app.routers import (
     interview,
     jobs,
     tracker,
+    background_jobs,
 )
 
 # Set up sensitive data redacting for all loggers
@@ -64,6 +65,7 @@ app.include_router(readiness.router)
 app.include_router(interview.router)
 app.include_router(jobs.router)
 app.include_router(tracker.router)
+app.include_router(background_jobs.router)
 
 
 

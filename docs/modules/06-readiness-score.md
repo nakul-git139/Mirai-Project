@@ -174,3 +174,24 @@ make test
 ```
 **Expected Result**:
 - All 67 tests pass cleanly (15 formula and readiness tests, 52 earlier module tests, 0 failures).
+
+---
+
+## [2026-10-18] Changes: Mock Interview Paused & Score Rescaling
+
+### 1. Summary of Changes
+- Integrated `ENABLE_MOCK_INTERVIEW` configuration flag (default: `False`).
+- Updated `calculate_readiness_formula` in `backend/app/services/readiness_service.py` to handle the mock interview being paused or not taken.
+- When `ENABLE_MOCK_INTERVIEW` is `False` or the interview is absent:
+  - Rescales the remaining 6 criteria weights to 100 by dividing each component's base weight by 80 ($W_i / 80 \times 100$):
+    - Resume: 31.25%
+    - Projects: 31.25%
+    - GitHub Presence: 12.50%
+    - Coding Practice: 12.50%
+    - LinkedIn Profile: 6.25%
+    - Co-curricular: 6.25%
+    - Mock Interview: 0.00% (excluded)
+  - Surfaces notification note: *"Mock interview not included. Your score is based on the other 80% of the readiness criteria."*
+  - Suppresses mock interview actions from the Top 5 actions recommendations when flag is off.
+- When `ENABLE_MOCK_INTERVIEW` is `True` and interview is taken:
+  - Retains original 20% weight and 100-point sum without the note.

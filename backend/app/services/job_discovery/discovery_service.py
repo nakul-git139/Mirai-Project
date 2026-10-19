@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import logging
 import asyncio
 import time
@@ -75,6 +76,7 @@ class JobDiscoveryService:
         self._cached_external_jobs: List[Dict[str, Any]] = []
         self._cache_timestamp: float = 0.0
         self._cache_ttl_seconds: float = 300.0  # 5 minutes
+        self._lock = asyncio.Lock()
 
     def get_configured_sources(self) -> Dict[str, Any]:
         """Return currently configured sources and slugs."""
@@ -109,15 +111,24 @@ class JobDiscoveryService:
         self._cache_timestamp = 0.0
 
     async def fetch_external_jobs(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
-        """Fetch and cache external jobs from Greenhouse, Lever, and RSS feeds."""
+        """Fetch and cache external jobs from Greenhouse, Lever, and RSS feeds with stampede protection."""
         now = time.time()
         if not force_refresh and self._cached_external_jobs and (now - self._cache_timestamp) < self._cache_ttl_seconds:
             logger.info("Serving external raw jobs from in-memory cache")
             return list(self._cached_external_jobs)
 
-        gh_fetcher = GreenhouseFetcher(company_slugs=self.greenhouse_slugs)
-        lv_fetcher = LeverFetcher(company_slugs=self.lever_slugs)
-        rss_fetcher = RSSFeedFetcher(feeds=self.rss_feeds)
+        if os.environ.get("OFFLINE_MODE") == "1":
+            return list(self._cached_external_jobs)
+
+        async with self._lock:
+            # Double-check inside lock
+            now = time.time()
+            if not force_refresh and self._cached_external_jobs and (now - self._cache_timestamp) < self._cache_ttl_seconds:
+                return list(self._cached_external_jobs)
+
+            gh_fetcher = GreenhouseFetcher(company_slugs=self.greenhouse_slugs)
+            lv_fetcher = LeverFetcher(company_slugs=self.lever_slugs)
+            rss_fetcher = RSSFeedFetcher(feeds=self.rss_feeds)
 
         results = await asyncio.gather(
             gh_fetcher.fetch_jobs(),

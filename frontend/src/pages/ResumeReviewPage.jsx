@@ -20,6 +20,8 @@ import {
 import { api, getToken } from '../api';
 import LinkedInReviewTab from './LinkedInReviewTab';
 import GitHubReviewTab from './GitHubReviewTab';
+import OllamaProgressIndicator from '../components/OllamaProgressIndicator';
+import JobProgressIndicator from '../components/JobProgressIndicator';
 
 function LinkedinIcon({ className = "w-4 h-4" }) {
   return (
@@ -48,6 +50,7 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
   const [review, setReview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [runningReview, setRunningReview] = useState(false);
+  const [activeJobId, setActiveJobId] = useState(() => localStorage.getItem('active_job_resume_review') || null);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all'); // all, failed, passed
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -57,6 +60,12 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
 
   useEffect(() => {
     loadReview();
+    // Check if there is an existing active job from previous session
+    const savedJob = localStorage.getItem('active_job_resume_review');
+    if (savedJob) {
+      setActiveJobId(savedJob);
+      setRunningReview(true);
+    }
   }, [currentUser]);
 
   const loadReview = async () => {
@@ -85,13 +94,16 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
     setRunningReview(true);
     setError(null);
     try {
-      const res = await api.triggerResumeReview(fileToUpload);
-      setReview(res);
-      setPreviewTimestamp(Date.now());
-      setUploadFile(null);
+      const res = await api.triggerResumeReviewAsync(fileToUpload);
+      setActiveJobId(res.id);
+      localStorage.setItem('active_job_resume_review', res.id);
     } catch (err) {
-      setError(err.message || "Failed to execute resume review.");
-    } finally {
+      if (err.status === 429) {
+        const retry = err.data?.detail?.retry_after || err.data?.retry_after || 60;
+        setError(`Rate limit exceeded: Maximum reviews per hour reached. Please retry after ${retry} seconds.`);
+      } else {
+        setError(err.message || "Failed to execute resume review.");
+      }
       setRunningReview(false);
     }
   };
@@ -150,13 +162,12 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
       {/* Top Header */}
       <header className="sticky top-0 z-20 backdrop-blur-md bg-slate-900/80 border-b border-slate-800 px-8 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition ${
-            activeSubTab === 'github'
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition ${activeSubTab === 'github'
               ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
               : activeSubTab === 'linkedin'
-              ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
-              : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-          }`}>
+                ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
+                : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+            }`}>
             {activeSubTab === 'github' ? (
               <GitHubIcon className="w-5 h-5" />
             ) : activeSubTab === 'linkedin' ? (
@@ -170,15 +181,14 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
               {activeSubTab === 'github'
                 ? 'GitHub & Codebase Review'
                 : activeSubTab === 'linkedin'
-                ? 'LinkedIn Benchmark Review'
-                : 'Resume Benchmark Review'}
-              <span className={`text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full border ${
-                activeSubTab === 'github'
+                  ? 'LinkedIn Benchmark Review'
+                  : 'Resume Benchmark Review'}
+              <span className={`text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full border ${activeSubTab === 'github'
                   ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
                   : activeSubTab === 'linkedin'
-                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                  : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-              }`}>
+                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                    : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                }`}>
                 Official Rubric
               </span>
             </h1>
@@ -186,8 +196,8 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
               {activeSubTab === 'github'
                 ? 'Repository code quality, secrets security, and Playwright live link verification.'
                 : activeSubTab === 'linkedin'
-                ? 'Benchmark LinkedIn profile completeness, specificity, and resume alignment.'
-                : 'Deterministic rubric evaluation for MSOT student placement readiness.'}
+                  ? 'Benchmark LinkedIn profile completeness, specificity, and resume alignment.'
+                  : 'Deterministic rubric evaluation for MSOT student placement readiness.'}
             </p>
           </div>
         </div>
@@ -198,11 +208,10 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
             <button
               id="subtab-resume"
               onClick={() => setActiveSubTab('resume')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
-                activeSubTab === 'resume'
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${activeSubTab === 'resume'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               <FileText className="w-3.5 h-3.5" />
               <span>Resume</span>
@@ -210,11 +219,10 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
             <button
               id="subtab-linkedin"
               onClick={() => setActiveSubTab('linkedin')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
-                activeSubTab === 'linkedin'
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${activeSubTab === 'linkedin'
                   ? 'bg-sky-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               <LinkedinIcon className="w-3.5 h-3.5" />
               <span>LinkedIn</span>
@@ -222,11 +230,10 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
             <button
               id="subtab-github"
               onClick={() => setActiveSubTab('github')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
-                activeSubTab === 'github'
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${activeSubTab === 'github'
                   ? 'bg-purple-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               <GitHubIcon className="w-3.5 h-3.5" />
               <span>GitHub & Live</span>
@@ -276,274 +283,290 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
           <>
 
 
-        {/* Error Notification */}
-        {error && (
-          <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <ShieldAlert className="w-4 h-4 flex-shrink-0" />
-              <span>{error}</span>
-            </div>
-            <button
-              onClick={() => setError(null)}
-              className="text-rose-400 hover:text-white text-xs underline"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* Loading Spinner */}
-        {loading && (
-          <div className="p-16 text-center space-y-3">
-            <RotateCw className="w-8 h-8 animate-spin text-blue-400 mx-auto" />
-            <p className="text-xs text-slate-400">Loading benchmark review data...</p>
-          </div>
-        )}
-
-        {/* No Review State */}
-        {!loading && !review && (
-          <div className="p-12 rounded-3xl bg-slate-950/60 border border-slate-800 text-center space-y-5 shadow-xl">
-            <div className="w-16 h-16 rounded-3xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto border border-blue-500/20 shadow-inner">
-              <FileText className="w-8 h-8" />
-            </div>
-            <div className="max-w-md mx-auto space-y-2">
-              <h3 className="text-lg font-bold text-white">No Resume Review On File</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Upload your resume (PDF or Word DOCX) to get a comprehensive benchmark audit. Every check evaluates page count, ATS friendliness, project metrics, action verbs, links, and visual layout.
-              </p>
-            </div>
-            <div className="pt-2">
-              <label className="inline-flex cursor-pointer px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition items-center gap-2 shadow-lg shadow-blue-500/25">
-                <Upload className="w-4 h-4" />
-                Select Resume to Review
-                <input
-                  type="file"
-                  accept=".pdf,.docx"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-              </label>
-            </div>
-          </div>
-        )}
-
-        {/* Scorecard & Review Details */}
-        {!loading && review && (
-          <>
-            {/* Top Scorecard Widget */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Score Dial / Ring Card */}
-              <div className="p-6 rounded-3xl bg-slate-950/70 border border-slate-800 flex flex-col items-center justify-center text-center space-y-3 shadow-xl relative overflow-hidden">
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Readiness Benchmark Score
+            {/* Error Notification */}
+            {error && (
+              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+                  <span>{error}</span>
                 </div>
-
-                <div className={`w-28 h-28 rounded-full border-4 flex flex-col items-center justify-center shadow-inner transition-all ${getScoreColor(review.score)}`}>
-                  <span className="text-3xl font-extrabold tracking-tight">{review.score}</span>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">/ 100</span>
-                </div>
-
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getScoreBadge(review.score).color}`}>
-                  {getScoreBadge(review.score).label}
-                </span>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-rose-400 hover:text-white text-xs underline"
+                >
+                  Dismiss
+                </button>
               </div>
+            )}
 
-              {/* Summary & Impact Card */}
-              <div className="md:col-span-2 p-6 rounded-3xl bg-slate-950/70 border border-slate-800 flex flex-col justify-between space-y-4 shadow-xl">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                      Evaluator Summary
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      {review.created_at ? new Date(review.created_at).toLocaleDateString() : 'Latest Review'}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-200 leading-relaxed font-medium">
-                    {review.summary}
+            {/* Running Review Background Job Progress Indicator */}
+            {runningReview && activeJobId ? (
+              <JobProgressIndicator
+                jobId={activeJobId}
+                taskType="resume_review"
+                featureTitle="Resume Benchmark Review"
+                onComplete={(res) => {
+                  setReview(res);
+                  setActiveJobId(null);
+                  setRunningReview(false);
+                  setPreviewTimestamp(Date.now());
+                  setUploadFile(null);
+                }}
+                onError={(err) => {
+                  setError(err);
+                  setActiveJobId(null);
+                  setRunningReview(false);
+                }}
+              />
+            ) : runningReview && (
+              <OllamaProgressIndicator featureName="Resume Benchmark Review" />
+            )}
+
+            {/* Loading Spinner */}
+            {loading && (
+              <div className="p-16 text-center space-y-3">
+                <RotateCw className="w-8 h-8 animate-spin text-blue-400 mx-auto" />
+                <p className="text-xs text-slate-400">Loading benchmark review data...</p>
+              </div>
+            )}
+
+            {/* No Review State */}
+            {!loading && !review && (
+              <div className="p-12 rounded-3xl bg-slate-950/60 border border-slate-800 text-center space-y-5 shadow-xl">
+                <div className="w-16 h-16 rounded-3xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto border border-blue-500/20 shadow-inner">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <div className="max-w-md mx-auto space-y-2">
+                  <h3 className="text-lg font-bold text-white">No Resume Review On File</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Upload your resume (PDF or Word DOCX) to get a comprehensive benchmark audit. Every check evaluates page count, ATS friendliness, project metrics, action verbs, links, and visual layout.
                   </p>
                 </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-800/80">
-                  <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Total Criteria</span>
-                    <div className="text-lg font-bold text-white mt-0.5">{checks.length}</div>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/20">
-                    <span className="text-[10px] text-emerald-400 uppercase font-semibold">Passed</span>
-                    <div className="text-lg font-bold text-emerald-400 mt-0.5">{passedCount}</div>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-amber-500/5 border border-amber-500/20">
-                    <span className="text-[10px] text-amber-400 uppercase font-semibold">Fixes Needed</span>
-                    <div className="text-lg font-bold text-amber-400 mt-0.5">{failedCount}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Checklist Filters and Preview Toggle */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
-              {/* Category Filter Pills */}
-              <div className="flex items-center space-x-2 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800 w-fit">
-                <button
-                  onClick={() => setFilter('all')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-                    filter === 'all'
-                      ? 'bg-blue-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  All Checks ({checks.length})
-                </button>
-                <button
-                  onClick={() => setFilter('failed')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
-                    filter === 'failed'
-                      ? 'bg-amber-600 text-white shadow'
-                      : 'text-slate-400 hover:text-amber-400'
-                  }`}
-                >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Needs Fix ({failedCount})
-                </button>
-                <button
-                  onClick={() => setFilter('passed')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
-                    filter === 'passed'
-                      ? 'bg-emerald-600 text-white shadow'
-                      : 'text-slate-400 hover:text-emerald-400'
-                  }`}
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  Passed ({passedCount})
-                </button>
-              </div>
-
-              {/* View Rendered PDF Page Toggle */}
-              <button
-                onClick={() => setPreviewOpen(!previewOpen)}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition flex items-center gap-2 w-fit shadow-sm"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                {previewOpen ? 'Hide Visual Layout Preview' : 'Show Visual Layout Preview'}
-              </button>
-            </div>
-
-            {/* Visual Page Preview Panel */}
-            {previewOpen && (
-              <div className="p-6 rounded-3xl bg-slate-950/80 border border-slate-800 space-y-4 shadow-xl">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <div className="flex items-center space-x-2">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">
-                      Rendered Document Preview (PyMuPDF 150 DPI)
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-slate-400">
-                    Used to inspect alignment, typography, margins, and whitespace consistency.
-                  </span>
-                </div>
-
-                <div className="flex justify-center bg-slate-900/90 p-4 rounded-2xl border border-slate-800/80 overflow-x-auto">
-                  <img
-                    src={`${api.getResumePreviewUrl()}?token=${encodeURIComponent(getToken() || '')}&t=${previewTimestamp}`}
-                    alt="Resume Rendered Preview"
-                    className="max-h-[600px] w-auto rounded-lg shadow-2xl border border-slate-700 object-contain"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
+                <div className="pt-2">
+                  <label className="inline-flex cursor-pointer px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition items-center gap-2 shadow-lg shadow-blue-500/25">
+                    <Upload className="w-4 h-4" />
+                    Select Resume to Review
+                    <input
+                      type="file"
+                      accept=".pdf,.docx"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                  </label>
                 </div>
               </div>
             )}
 
-            {/* Benchmark Checks Detailed Cards */}
-            <div className="space-y-4">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-blue-400" />
-                Benchmark Checklist Criteria
-              </h2>
+            {/* Scorecard & Review Details */}
+            {!loading && review && (
+              <>
+                {/* Top Scorecard Widget */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Score Dial / Ring Card */}
+                  <div className="p-6 rounded-3xl bg-slate-950/70 border border-slate-800 flex flex-col items-center justify-center text-center space-y-3 shadow-xl relative overflow-hidden">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Readiness Benchmark Score
+                    </div>
 
-              <div className="grid grid-cols-1 gap-4">
-                {filteredChecks.map((chk) => {
-                  const isPassed = chk.pass ?? chk.passed;
-                  return (
-                    <div
-                      key={chk.id}
-                      className={`p-5 rounded-2xl border transition shadow-lg ${
-                        isPassed
-                          ? 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
-                          : 'bg-slate-950/80 border-amber-500/30 hover:border-amber-500/50'
-                      }`}
-                    >
-                      {/* Check Card Header */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/70">
-                        <div className="flex items-center space-x-3">
-                          <span className="px-2 py-0.5 rounded-md bg-slate-800 text-[10px] font-mono font-semibold text-slate-300 border border-slate-700">
-                            {chk.id}
-                          </span>
-                          <h3 className="text-sm font-bold text-white">{chk.label}</h3>
-                        </div>
+                    <div className={`w-28 h-28 rounded-full border-4 flex flex-col items-center justify-center shadow-inner transition-all ${getScoreColor(review.score)}`}>
+                      <span className="text-3xl font-extrabold tracking-tight">{review.score}</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400">/ 100</span>
+                    </div>
 
-                        {/* Pass/Fail Badge */}
-                        <div className="flex items-center">
-                          {isPassed ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              PASS
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                              <XCircle className="w-3.5 h-3.5" />
-                              FIX REQUIRED
-                            </span>
-                          )}
-                        </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getScoreBadge(review.score).color}`}>
+                      {getScoreBadge(review.score).label}
+                    </span>
+                  </div>
+
+                  {/* Summary & Impact Card */}
+                  <div className="md:col-span-2 p-6 rounded-3xl bg-slate-950/70 border border-slate-800 flex flex-col justify-between space-y-4 shadow-xl">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          Evaluator Summary
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {review.created_at ? new Date(review.created_at).toLocaleDateString() : 'Latest Review'}
+                        </span>
                       </div>
+                      <p className="text-sm text-slate-200 leading-relaxed font-medium">
+                        {review.summary}
+                      </p>
+                    </div>
 
-                      {/* Evidence & Specific Fix Details */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3.5 text-xs">
-                        {/* Evidence Box */}
-                        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                            Observed Evidence
-                          </span>
-                          <p className="text-slate-300 leading-relaxed font-mono text-[11px]">
-                            {chk.evidence}
-                          </p>
-                        </div>
-
-                        {/* Specific Actionable Fix Box */}
-                        <div
-                          className={`p-3.5 rounded-xl border space-y-1.5 ${
-                            isPassed
-                              ? 'bg-slate-900/40 border-slate-800/80'
-                              : 'bg-amber-500/5 border-amber-500/20'
-                          }`}
-                        >
-                          <span
-                            className={`text-[10px] font-bold uppercase tracking-wider ${
-                              isPassed ? 'text-slate-400' : 'text-amber-400'
-                            }`}
-                          >
-                            {isPassed ? 'Benchmark Recommendation' : 'Actionable Fix (Specific)'}
-                          </span>
-                          <p
-                            className={`leading-relaxed font-medium ${
-                              isPassed ? 'text-slate-400' : 'text-amber-200'
-                            }`}
-                          >
-                            {chk.fix}
-                          </p>
-                        </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-800/80">
+                      <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Total Criteria</span>
+                        <div className="text-lg font-bold text-white mt-0.5">{checks.length}</div>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/20">
+                        <span className="text-[10px] text-emerald-400 uppercase font-semibold">Passed</span>
+                        <div className="text-lg font-bold text-emerald-400 mt-0.5">{passedCount}</div>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+                        <span className="text-[10px] text-amber-400 uppercase font-semibold">Fixes Needed</span>
+                        <div className="text-lg font-bold text-amber-400 mt-0.5">{failedCount}</div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          </>
-        )}
+                  </div>
+                </div>
+
+                {/* Checklist Filters and Preview Toggle */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+                  {/* Category Filter Pills */}
+                  <div className="flex items-center space-x-2 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800 w-fit">
+                    <button
+                      onClick={() => setFilter('all')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${filter === 'all'
+                          ? 'bg-blue-600 text-white shadow'
+                          : 'text-slate-400 hover:text-white'
+                        }`}
+                    >
+                      All Checks ({checks.length})
+                    </button>
+                    <button
+                      onClick={() => setFilter('failed')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${filter === 'failed'
+                          ? 'bg-amber-600 text-white shadow'
+                          : 'text-slate-400 hover:text-amber-400'
+                        }`}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Needs Fix ({failedCount})
+                    </button>
+                    <button
+                      onClick={() => setFilter('passed')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${filter === 'passed'
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'text-slate-400 hover:text-emerald-400'
+                        }`}
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      Passed ({passedCount})
+                    </button>
+                  </div>
+
+                  {/* View Rendered PDF Page Toggle */}
+                  <button
+                    onClick={() => setPreviewOpen(!previewOpen)}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition flex items-center gap-2 w-fit shadow-sm"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    {previewOpen ? 'Hide Visual Layout Preview' : 'Show Visual Layout Preview'}
+                  </button>
+                </div>
+
+                {/* Visual Page Preview Panel */}
+                {previewOpen && (
+                  <div className="p-6 rounded-3xl bg-slate-950/80 border border-slate-800 space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                      <div className="flex items-center space-x-2">
+                        <Sparkles className="w-4 h-4 text-blue-400" />
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">
+                          Rendered Document Preview (PyMuPDF 150 DPI)
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        Used to inspect alignment, typography, margins, and whitespace consistency.
+                      </span>
+                    </div>
+
+                    <div className="flex justify-center bg-slate-900/90 p-4 rounded-2xl border border-slate-800/80 overflow-x-auto">
+                      <img
+                        src={`${api.getResumePreviewUrl()}?token=${encodeURIComponent(getToken() || '')}&t=${previewTimestamp}`}
+                        alt="Resume Rendered Preview"
+                        className="max-h-[600px] w-auto rounded-lg shadow-2xl border border-slate-700 object-contain"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Benchmark Checks Detailed Cards */}
+                <div className="space-y-4">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <FileCheck className="w-4 h-4 text-blue-400" />
+                    Benchmark Checklist Criteria
+                  </h2>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {filteredChecks.map((chk) => {
+                      const isPassed = chk.pass ?? chk.passed;
+                      return (
+                        <div
+                          key={chk.id}
+                          className={`p-5 rounded-2xl border transition shadow-lg ${isPassed
+                              ? 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
+                              : 'bg-slate-950/80 border-amber-500/30 hover:border-amber-500/50'
+                            }`}
+                        >
+                          {/* Check Card Header */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/70">
+                            <div className="flex items-center space-x-3">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-[10px] font-mono font-semibold text-slate-300 border border-slate-700">
+                                {chk.id}
+                              </span>
+                              <h3 className="text-sm font-bold text-white">{chk.label}</h3>
+                            </div>
+
+                            {/* Pass/Fail Badge */}
+                            <div className="flex items-center">
+                              {isPassed ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  PASS
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                                  <XCircle className="w-3.5 h-3.5" />
+                                  FIX REQUIRED
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Evidence & Specific Fix Details */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3.5 text-xs">
+                            {/* Evidence Box */}
+                            <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                Observed Evidence
+                              </span>
+                              <p className="text-slate-300 leading-relaxed font-mono text-[11px]">
+                                {chk.evidence}
+                              </p>
+                            </div>
+
+                            {/* Specific Actionable Fix Box */}
+                            <div
+                              className={`p-3.5 rounded-xl border space-y-1.5 ${isPassed
+                                  ? 'bg-slate-900/40 border-slate-800/80'
+                                  : 'bg-amber-500/5 border-amber-500/20'
+                                }`}
+                            >
+                              <span
+                                className={`text-[10px] font-bold uppercase tracking-wider ${isPassed ? 'text-slate-400' : 'text-amber-400'
+                                  }`}
+                              >
+                                {isPassed ? 'Benchmark Recommendation' : 'Actionable Fix (Specific)'}
+                              </span>
+                              <p
+                                className={`leading-relaxed font-medium ${isPassed ? 'text-slate-400' : 'text-amber-200'
+                                  }`}
+                              >
+                                {chk.fix}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </>
         )}
       </main>

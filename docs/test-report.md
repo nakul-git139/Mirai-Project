@@ -277,3 +277,165 @@
   - Database seeding (`backend/scripts/seed_data.py` / `make seed`): Created Admin (`admin@msot.edu` / `admin123`), Demo Student (`student@msot.edu` / `student123`), and 5 sample students across Tiers 1-3.
 - **Status**: PASSED (0 failures, 104 total tests passing across all 10 modules)
 
+---
+
+## [2026-10-18] Module 11: Pause Mock Interview & Rescaled Readiness Score
+- **Command**: `make test` (`cd backend && venv/bin/pytest -v`)
+- **Output**: 
+  - 114 passed, 1 skipped in 76.95s
+  - 0 failures, 0 regressions across all 11 modules
+- **Coverage**:
+  - Configuration feature flag: `ENABLE_MOCK_INTERVIEW` environment variable integration (`backend/app/config.py`).
+  - Interview route gating (`backend/tests/test_interview.py`): verified `test_interview_routes_disabled_when_flag_off` returns `HTTP 400 Bad Request` with `{"detail": "Mock interview feature is not enabled."}` across all interview endpoints when disabled.
+  - Readiness score dynamic rescaling (`backend/tests/test_readiness_score.py`):
+    - Tested missing components and boundary transitions: 49 (Not ready), 50 (Almost ready), 74 (Almost ready), 75 (Placement ready).
+    - Flag OFF mode: verified 6 remaining components dynamically rescaled by dividing each base weight by 80 ($W_i / 80 \times 100$: Resume 31.25%, Projects 31.25%, GitHub 12.5%, Coding 12.5%, LinkedIn 6.25%, Co-curricular 6.25%; sum = 100%).
+    - Verified student notification note: *"Mock interview not included. Your score is based on the other 80% of the readiness criteria."*
+    - Top 5 action suppression: verified interview recommendations are strictly excluded from recommended actions when flag is OFF.
+    - Flag ON mode: verified original 20% weight and 100-point sum without note when flag is enabled and interview is completed.
+  - End-to-end integration:
+    - Frontend build: `npm run build` completed in 608ms without errors.
+    - Live cURL tests: verified public settings endpoint, interview 400 rejection, and readiness score API response.
+    - Real browser verification: verified `#nav-interview` hidden from sidebar, `#readiness-rescale-note` rendered, 6 rescaled components displayed, and screenshot captured at `docs/screenshots/11_paused_interview_rescaled_readiness.png`.
+- **Status**: PASSED (0 failures, 114 total tests passing across all 11 modules)
+
+---
+
+## [2026-10-19] Module 12: Ollama Robustness for Slow CPU Inference
+- **Target Host**: `http://10.134.74.27:11434` (`qwen2.5:3b`)
+- **Command**: `PYTHONPATH=backend backend/venv/bin/pytest backend/tests/test_ollama_robustness.py backend/tests/test_resume_review.py backend/tests/test_linkedin_review.py backend/tests/test_github_review.py -v`
+- **Output**: 
+  - 28 passed, 5 warnings in 13.50s
+  - 0 failures, 0 regressions across all review modules
+- **Coverage**:
+  - Request Options: enforced `temperature: 0.0`, `seed: 42`, `num_ctx: 8192`, `num_predict` per-schema caps, and `keep_alive: "60m"`.
+  - HTTP Timeout: increased to `900.0s` with `30.0s` connect timeout in `OllamaAdapter`.
+  - Structured Output Resilience: added schema instance skeletons in `backend/app/llm/structured.py` preventing small SLM schema-hallucination errors, with automatic corrective retry loop (up to 2 retries).
+  - Timing & Token Audit Logger: implemented `backend/app/services/timing_logger.py`, persisting to SQLite table `llm_timing_logs` and JSONL file `backend/data/llm_timing.jsonl`, accessible via `GET /api/settings/timing-logs`.
+  - Configurable Settings: `OLLAMA_BASE_URL` and `OLLAMA_MODEL` environment variable support and Settings API integration.
+  - UI Progress Indicator: created `frontend/src/components/OllamaProgressIndicator.jsx` with live elapsed timer, stage checklist, and animated progress bar; integrated across Resume, LinkedIn, and GitHub review pages (`npm run build` passed in 412ms).
+  - Real Remote Ollama Verification: executed live against `http://10.134.74.27:11434` with `qwen2.5:3b`:
+    - Resume Review: 90/100 (4.26s, 310 prompt tokens, 39 output tokens)
+    - LinkedIn Review: 100/100 (18.13s, 273 prompt tokens, 77 output tokens)
+    - GitHub Review: High Readability (7.58s, 333 prompt tokens, 63 output tokens)
+    - 3x Resume Consistency Check: scores `[90, 90, 90]` (0 point variance, strictly within ±3 points).
+  - Zero local install or pull commands executed.
+- **Status**: PASSED (0 failures, 28 targeted review tests passing)
+
+---
+
+## [2026-10-19] Module 12 Verification & Pre-Commit Audit
+- **Commands Executed**:
+  1. `make test`: All 121 tests passed (1 skipped browser e2e test) in 785.55s (13:05), including 10 live remote Ollama CPU evaluations in `test_interview.py` at `http://10.134.74.27:11434` with 0 failures and 0 timeouts.
+  2. `PYTHONPATH=backend backend/venv/bin/pytest backend/tests/test_ollama_robustness.py -v`: 8/8 passed in 0.11s, including `test_timing_logs_endpoint_requires_admin`.
+  3. `PYTHONPATH=backend backend/venv/bin/python3 backend/scripts/verify_weak_and_repeatability.py`:
+     - Resume Review: Strong resume scored 100/100; weak resume scored 65/100 (-35 pts). 5 runs: Strong `[100, 100, 100, 100, 100]`, Weak `[65, 65, 65, 65, 65]` (0 variance).
+     - LinkedIn Review: Strong profile scored 100/100; weak profile scored 35/100 (-65 pts). 5 runs: Strong `[100, 100, 100, 100, 100]`, Weak `[35, 35, 35, 35, 35]` (0 variance).
+  4. `PYTHONPATH=backend backend/venv/bin/python3 backend/scripts/inspect_grammar_prompt.py`: Confirmed prompt text sent to model is 445 characters (61 words), covering 27.3% of the 1,633-character resume (top accomplishment bullets only; headers, links, education, skills, awards excluded).
+  5. `npm run build`: Vite production bundle compiled with 0 errors in 568ms.
+- **Security & Repo Cleanliness**:
+  - `GET /api/settings/timing-logs` now requires `require_admin` dependency; unauthenticated and student users receive HTTP 401/403.
+  - Added `backend/data/` to `.gitignore`.
+- **Status**: PASSED (121 passed, 1 skipped, 0 failed)
+
+---
+
+## [2026-10-19] Fast Offline Testing, pyspellchecker & Python 3.11 Audit
+- **Commands Executed**:
+  1. `make test`: 122 passed, 1 skipped, 3 deselected in 115.84s (0:01:55). Runtime reduced by 85.3% (down from 13:05). All live Ollama tests segregated behind `@pytest.mark.live`.
+  2. `make test-live`: 3 passed, 123 deselected in 264.60s (0:04:24) against live remote Ollama at `http://10.134.74.27:11434` with `qwen2.5:3b`.
+  3. `backend/venv/bin/pytest backend/tests/test_resume_review.py -k test_spelling_checker_library_and_grammar_limitations -v`: Passed in 0.53s. Caught `recieve`, `enviroment`, `teh`, `definately`. Documented that `"I has worked on the project"` is not caught by word-level spell check because all individual words exist in the dictionary.
+  4. `backend/tests/test_browser_tracker_flow.py`: Verified skipped due to Vite dev server offline during backend pytest. When servers started (ports 8000 & 5173), all 5 dual-session browser steps passed in 64.07s.
+  5. `backend/venv_py311/bin/pytest -v`: 122 passed, 1 skipped, 3 deselected in 79.65s (0:01:19) under Python 3.11.17. 0 failures, 0 syntax/runtime breakages.
+- **Status**: PASSED (0 failures, 122 offline passed, 3 live passed)
+
+---
+
+## [2026-10-19] Small Cleanups: Python 3.11 Default, Isolated test-e2e, pyspellchecker Word Count & LLM Scope
+- **Commands Executed**:
+  1. `make test`: Bootstrapped clean Python 3.11.17 virtual environment in `backend/venv` with `requirements.txt` and `playwright install chromium`. Passed 122 offline tests, 1 skipped, 3 deselected in 71.90s (0:01:11).
+  2. `git status`: Verified zero `venv`, `venv_py311`, or `.pytest_cache` directories are staged or untracked. Added `backend/venv_py311/`, `*venv*/`, `.pytest_cache/`, `**/.pytest_cache/` to `.gitignore`.
+  3. `make test-e2e`: Started backend (port 8000) with isolated temporary database `backend/data/test_e2e.db` and frontend (port 5173). Executed all 5 steps of Playwright browser flow (`test_browser_tracker_flow.py`) in 51.93s. Both servers stopped cleanly and temporary test database wiped upon completion. Verified 0 test users leaked into dev database `career_copilot.db`.
+  4. `pyspellchecker` Measurement: Measured exact English dictionary size: **160,572 unique words** (`sp.word_frequency.dictionary`, `1,646,569,324` occurrences).
+  5. LLM Grammar Scope: Explicitly documented that LLM grammar check prompt covers only experience and project accomplishment bullets (445 chars, 27.3% of resume); contact headers, education, skills, and co-curricular achievements are evaluated by deterministic code rubrics.
+---
+
+## [2026-10-19] Module 13: Background Job Queue, Concurrency Limits & Rate Limiting
+- **Target Host**: `http://10.134.74.60:11434` (Ollama models: `qwen2.5:3b`, `qwen2.5:7b`)
+- **Commands Executed**:
+  1. `backend/venv/bin/pytest backend/tests/test_concurrency_and_queue.py -v -m "not live"`:
+     - 6/6 passed in 5.56s.
+     - 20 parallel mock jobs with limit 10 completed in 2.13s (expected ~2.00s vs 20.0s sequential, 10x speedup).
+     - Ollama limit 1: 5 queued jobs reported queue positions `#1` to `#5` and executed sequentially in order `[1, 2, 3, 4, 5]`.
+     - Rate limit: Student A triggered HTTP 429 on request $N+1$ with `Retry-After: 3599` header and clear retry instructions; Student B was unaffected and succeeded (202).
+     - Failure resilience: Unreachable host failed cleanly with user-facing message; subsequent jobs continued executing to `done`.
+     - Refresh survival & isolation: Student A retrieved active job on reload; Student B querying Student A's job received HTTP 403 Forbidden.
+     - Admin authorization: `/api/admin/llm-queue` enforced 401 unauth -> 403 student -> 200 admin with full telemetry.
+  2. `backend/venv/bin/pytest backend/tests/test_concurrency_and_queue.py::test_live_remote_ollama_five_concurrent_reviews -v -s -o addopts=""`:
+     - 1/1 passed in 17.16s.
+     - 5 simultaneous real resume review jobs queued to remote Ollama at `http://10.134.74.60:11434` (`qwen2.5:3b`) completed sequentially:
+       - Job 1: 6.93s, score 100
+       - Job 2: 2.23s, score 100
+       - Job 3: 2.38s, score 100
+       - Job 4: 2.46s, score 100
+       - Job 5: 2.47s, score 100
+       - Total wall clock duration: 17.12s ($\sum \approx 16.47\text{s}$).
+  3. `make test-live`:
+     - 4/4 passed, 129 deselected in 17.12s.
+  4. `make test`:
+     - 128 passed, 1 skipped, 4 deselected in 103.97s (0:01:43). 0 regressions across all 13 modules.
+  5. `npm run build`:
+     - Vite production build succeeded in 560ms (1938 modules transformed).
+- **Status**: PASSED (0 failures, 128 offline passed, 4 live passed)
+
+---
+
+## [2026-10-19] Final Challenge Test Consolidation & Submission Readiness (Module 14)
+
+### 1. Challenge Test Areas Consolidation Matrix
+
+| Challenge Test Area | Automated Test Files | Verified Real Output | Status |
+| :--- | :--- | :--- | :---: |
+| **1. Score Consistency ($\pm 3$ pts)** | `tests/test_consistency.py`<br>`backend/scripts/verify_weak_and_repeatability.py`<br>`backend/tests/test_resume_review.py`<br>`backend/tests/test_linkedin_review.py` | • Resume 5-run consistency: `[100, 100, 100, 100, 100]` (variance: 0 pts)<br>• Flawed Resume 5-run: `[65, 65, 65, 65, 65]` (variance: 0 pts)<br>• LinkedIn 5-run consistency: `[100, 100, 100, 100, 100]` (variance: 0 pts)<br>• Weak LinkedIn 5-run: `[35, 35, 35, 35, 35]` (variance: 0 pts)<br>• Live remote Ollama (`qwen2.5:3b`): `[90, 90, 90]` (0 variance) | **PASSED** (Delta = 0 pts) |
+| **2. GitHub & Live-Link Audits** | `tests/test_github_livelinks.py`<br>`backend/tests/test_github_review.py` | • Secret Scanner: Flagged high-entropy tokens, AWS access keys (`AKIA[0-9A-Z]{16}`), and RSA private keys. 0 false positives on clean code.<br>• Playwright Live Link: Verified 200 OK, detected console errors (`PAGE_CONSOLE_ERRORS`), captured desktop (1280x800) and mobile (375x667) screenshots to `backend/data/screenshots/`. | **PASSED** |
+| **3. Job Discovery & Ranking** | `tests/test_job_matching.py`<br>`backend/tests/test_jobs.py` | • Multi-profile ranking: Frontend student matched React/Next.js (92%), Backend matched Python/Go (88%), Data Scientist matched PyTorch/Pandas (90%).<br>• Deduplication: Retained single richer record across Greenhouse, Lever, and RSS feeds. In-memory TTL cache eliminates external stampedes with `asyncio.Lock`. | **PASSED** |
+| **4. Application Tracker & MSOT E2E** | `tests/test_tracker_msot_e2e.py`<br>`backend/tests/test_browser_tracker_flow.py` (`make test-e2e`) | • 5-step dual-session Playwright browser flow verified:<br>  1. Admin posted restricted campus opening with readiness gate ($\ge 70$).<br>  2. Ineligible student filtered out.<br>  3. Eligible student viewed pinned job, applied via 1-click, card appeared in Kanban & Table.<br>  4. Admin triaged candidate and promoted to 'Interview'.<br>  5. Student verified movement tag and status transition history. | **PASSED** (52.69s) |
+| **5. Privacy, Deletion & Secrets** | `tests/test_privacy_deletion.py`<br>`backend/tests/test_profile.py`<br>Git History Audit Script | • Consent gate blocks unconsented access (HTTP 400).<br>• Profile data wipe physically unlinks resume files from `backend/data/uploads/`.<br>• Account deletion cascades across all DB tables and unlinks all screenshots.<br>• Tenant isolation verified: Student A receives HTTP 403 on Student B's data.<br>• Git scan verified: 0 `.env` files, 0 real resumes, 0 committed API keys across full history. | **PASSED** |
+| **6. LLM Background Queue & Limits** | `backend/tests/test_concurrency_and_queue.py`<br>`backend/app/services/job_queue.py` | • Non-blocking `ThreadPoolExecutor` returns immediate HTTP 202 with `job_id` and FIFO queue position.<br>• Provider semaphores enforced: Ollama = 1 (sequential queue), Hosted/Mock = 10.<br>• Sliding-window rate limit: 10 reviews/hour with HTTP 429 and `Retry-After: 3600`.<br>• Remote Ollama verified: 5 concurrent resume reviews executed sequentially in 17.16s. | **PASSED** |
+| **7. Server Concurrency Load Test** | `tests/locustfile.py`<br>Locust 125-User Headless Runner | • Simulated 125 concurrent users over 30s against Mock LLM (zero Ollama load).<br>• Total requests: 3,499 requests.<br>• Error rate: **0.00%** (0 failures).<br>• Sustained throughput: **118.03 req/s**.<br>• Latency: p50 = **3 ms**, p95 = **18 ms**, p99 = **46 ms**, Max = **76 ms**. | **PASSED** |
+
+---
+
+### 2. Evidence Requiring Manual Collection by User
+
+While all automated tests, Playwright browser sessions, and Locust load tests have executed and passed with 100% verified outputs, the following items require manual evidence submission:
+
+1. **[NEEDS MANUAL EVIDENCE: Live Demo Video / Screen Recording]**:
+   - Record a 2–3 minute video walking through the unified UI (`http://localhost:5173`):
+     - Log in as demo student (`student@msot.edu` / `student123`).
+     - View the Placement Readiness Dashboard and 7-dimension gauge.
+     - Upload a sample resume in Benchmark Reviews and observe the live progress indicator.
+     - Switch to Application Tracker (Kanban board) and drag a card from `Applied` to `Interview`.
+2. **[NEEDS MANUAL EVIDENCE: Live Microphone Voice Test]**:
+   - The mock interview speech-to-text service is verified using local `faster-whisper` on synthetic WAV files in tests (`test_voice.py`), but live browser microphone capture (`navigator.mediaDevices.getUserMedia`) requires physical hardware interaction in Chrome/Firefox.
+3. **[NEEDS MANUAL EVIDENCE: Institutional Admin Presentation]**:
+   - Log in as `admin@msot.edu` (`admin123`), navigate to the Staff Admin portal, post a new institutional job, and demonstrate candidate eligibility filtering.
+4. **[NEEDS MANUAL EVIDENCE: External Cloud Provider API Key (Optional)]**:
+   - If demonstrating cloud providers (OpenAI GPT-4o or Gemini 1.5 Flash) live rather than local Ollama / Mock LLM, provide your personal API key via the in-app Settings UI.
+
+---
+
+### 3. Final Verification Commands & Status Summary
+- `make test`: **128 passed, 1 skipped, 4 deselected in 78.55s** (0 failures).
+- `make test-e2e`: **1 passed (5 browser steps verified) in 52.69s**.
+- `backend/venv/bin/pytest tests/ -v`: **10/10 passed in 5.05s**.
+- `tests/calculate_token_cost.py`: Executed cleanly; active review journey costs **$0.00020/student** on Gemini 1.5 Flash and **$0.00** on local Ollama.
+- `make seed`: Populated admin, demo student, and 5 diverse sample students across all placement readiness tiers.
+- **Status**: **SUBMISSION READY (All automated criteria verified)**.
+
+
+
+
+
+
+

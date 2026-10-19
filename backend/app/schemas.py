@@ -44,6 +44,8 @@ class SettingsUpdate(BaseModel):
     openai_api_key: Optional[str] = None
     claude_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
+    concurrency_limits: Optional[Dict[str, int]] = None
+    rate_limit_reviews_per_hour: Optional[int] = None
 
 
 class SettingsResponse(BaseModel):
@@ -55,6 +57,40 @@ class SettingsResponse(BaseModel):
     has_gemini_key: bool
     available_providers: List[str]
     default_models: Dict[str, str]
+    enable_mock_interview: bool = False
+    concurrency_limits: Dict[str, int] = Field(default_factory=dict)
+    rate_limit_reviews_per_hour: int = 10
+
+
+# ---------------- Background Job Schemas ----------------
+class BackgroundJobTriggerRequest(BaseModel):
+    task_type: str  # resume_review, linkedin_review, github_review, live_link_check, job_match
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    provider: Optional[str] = None
+
+
+class BackgroundJobResponse(BaseModel):
+    id: str
+    user_id: int
+    task_type: str
+    provider: str
+    status: str  # queued, running, done, failed
+    queue_position: Optional[int] = None
+    result: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
+class AdminQueueStatusResponse(BaseModel):
+    total_queue_length: int
+    provider_queues: Dict[str, int]
+    provider_limits: Dict[str, int]
+    running_jobs_count: int
+    running_jobs: List[Dict[str, Any]]
+    queued_jobs: List[Dict[str, Any]]
+    recent_timings: List[Dict[str, Any]]
 
 
 class ConnectionTestRequest(BaseModel):
@@ -374,7 +410,7 @@ class ProfileResponse(BaseModel):
 # ---------------- Readiness Score Schemas ----------------
 class ComponentBreakdown(BaseModel):
     name: str
-    weight: int
+    weight: float
     score: Optional[float] = None
     weighted_points: float = 0.0
     status: str = "scored"  # "scored" | "missing"
@@ -398,6 +434,7 @@ class ReadinessResponse(BaseModel):
     overall_score: int = Field(ge=0, le=100)
     raw_score: float = Field(ge=0.0, le=100.0)
     level: str  # "Not ready" | "Almost ready" | "Placement ready"
+    note: Optional[str] = None
     breakdown: Dict[str, ComponentBreakdown] = Field(default_factory=dict)
     missing_components: List[str] = Field(default_factory=list)
     completed_components: List[str] = Field(default_factory=list)

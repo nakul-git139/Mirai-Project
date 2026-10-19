@@ -19,6 +19,56 @@ from app.llm.adapters.mock_adapter import MockLLMAdapter
 from app.services.readiness_service import compute_and_save_readiness_score, get_current_readiness_score
 
 
+@pytest.fixture(autouse=True)
+def enable_interview_flag(monkeypatch, request):
+    """Enables interview flag by default for interview functional tests, and provides fast offline mock LLM for non-live tests."""
+    monkeypatch.setattr("app.config.ENABLE_MOCK_INTERVIEW", True)
+    if "live" not in request.keywords:
+        mock = MockLLMAdapter(model="mock-interview")
+        mock.set_queue([
+            '{"tech_depth_score": 28.0, "tech_depth_feedback": "Good depth", "clarity_score": 20.0, "clarity_feedback": "Clear", "grounded_exp_score": 20.0, "grounded_exp_feedback": "Grounded", "critical_think_score": 12.0, "critical_think_feedback": "Solid", "summary": "Strong response", "adaptive_followup": "Can you elaborate?", "is_off_topic": false}'
+        ] * 50)
+        monkeypatch.setattr("app.services.interview_service.get_llm_adapter", lambda *args, **kwargs: mock)
+
+
+def test_interview_routes_disabled_when_flag_off(client: TestClient, student_auth_headers: dict, monkeypatch):
+    """
+    Asserts that when ENABLE_MOCK_INTERVIEW is False:
+    All /api/interview endpoints reject requests with HTTP 400 and a clear 'feature not enabled' detail.
+    """
+    monkeypatch.setattr("app.config.ENABLE_MOCK_INTERVIEW", False)
+
+    # 1. Start route
+    r_start = client.post("/api/interview/start", json={"duration_minutes": 15}, headers=student_auth_headers)
+    assert r_start.status_code == 400
+    assert "Mock interview feature is not enabled." in r_start.json()["detail"]
+
+    # 2. Active route
+    r_act = client.get("/api/interview/active", headers=student_auth_headers)
+    assert r_act.status_code == 400
+    assert "Mock interview feature is not enabled." in r_act.json()["detail"]
+
+    # 3. History route
+    r_hist = client.get("/api/interview/history", headers=student_auth_headers)
+    assert r_hist.status_code == 400
+    assert "Mock interview feature is not enabled." in r_hist.json()["detail"]
+
+    # 4. End route
+    r_end = client.post("/api/interview/1/end", headers=student_auth_headers)
+    assert r_end.status_code == 400
+    assert "Mock interview feature is not enabled." in r_end.json()["detail"]
+
+    # 5. Message route
+    r_msg = client.post("/api/interview/1/message", json={"message": "hello"}, headers=student_auth_headers)
+    assert r_msg.status_code == 400
+    assert "Mock interview feature is not enabled." in r_msg.json()["detail"]
+
+    # 6. Replay route
+    r_rep = client.get("/api/interview/1/replay", headers=student_auth_headers)
+    assert r_rep.status_code == 400
+    assert "Mock interview feature is not enabled." in r_rep.json()["detail"]
+
+
 # ---------------- 1. Question Grounding & Mix Test ----------------
 def test_question_generation_grounded_in_resume():
     """
@@ -65,8 +115,10 @@ def test_question_generation_grounded_in_resume():
 
 
 # ---------------- 2. Three Scripted Sessions (Score Ordering) ----------------
+@pytest.mark.live
 def test_three_scripted_sessions_score_ordering():
     """
+    Live test against remote Ollama server (http://10.134.74.27:11434).
     Runs 3 scripted answer profiles against the fixed rubric:
       - Strong answerer: detailed architecture, STAR framing, specific metrics.
       - Weak answerer: one-word / terse responses ('yes', 'python').
@@ -76,6 +128,9 @@ def test_three_scripted_sessions_score_ordering():
       strong_score >= 75
       weak_score <= 45
     """
+    from app.llm.adapters.ollama_adapter import OllamaAdapter
+    ollama_adapter = OllamaAdapter(model="qwen2.5:3b", base_url="http://10.134.74.27:11434", timeout=60.0)
+
     q_tech = {
         "id": "Q1",
         "type": "technical",
@@ -114,15 +169,15 @@ def test_three_scripted_sessions_score_ordering():
     ]
 
     # Evaluate Strong
-    strong_scores = [evaluate_student_answer(q, a)["score"] for q, a in zip([q_tech, q_proj, q_hr], strong_answers)]
+    strong_scores = [evaluate_student_answer(q, a, llm_adapter=ollama_adapter)["score"] for q, a in zip([q_tech, q_proj, q_hr], strong_answers)]
     avg_strong = sum(strong_scores) / len(strong_scores)
 
     # Evaluate Weak
-    weak_scores = [evaluate_student_answer(q, a)["score"] for q, a in zip([q_tech, q_proj, q_hr], weak_answers)]
+    weak_scores = [evaluate_student_answer(q, a, llm_adapter=ollama_adapter)["score"] for q, a in zip([q_tech, q_proj, q_hr], weak_answers)]
     avg_weak = sum(weak_scores) / len(weak_scores)
 
     # Evaluate Off-topic
-    off_scores = [evaluate_student_answer(q, a)["score"] for q, a in zip([q_tech, q_proj, q_hr], off_topic_answers)]
+    off_scores = [evaluate_student_answer(q, a, llm_adapter=ollama_adapter)["score"] for q, a in zip([q_tech, q_proj, q_hr], off_topic_answers)]
     avg_off = sum(off_scores) / len(off_scores)
 
     print(f"\n[Scripted Sessions Score Ordering] Strong: {avg_strong:.1f}, Weak: {avg_weak:.1f}, Off-topic: {avg_off:.1f}")

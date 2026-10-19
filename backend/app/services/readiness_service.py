@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from app import config
 from app.models import ReadinessScore, ReviewResult, InterviewSession, Profile, User
 from app.schemas import (
     ComponentBreakdown,
@@ -96,14 +97,31 @@ def get_placement_level(score: int) -> str:
 
 
 def calculate_readiness_formula(
-    component_inputs: Dict[str, Dict[str, Any]]
+    component_inputs: Dict[str, Dict[str, Any]],
+    mock_interview_enabled: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Pure deterministic formula calculator:
-    Overall Score = round( sum( score_i * (weight_i / 100) ) )
-    Handles missing components explicitly (score=None -> 0 earned points, status='missing').
-    Generates and sorts Top 5 Action items by points gained in the overall score.
+    - When the interview is not enabled or not taken:
+        Calculate score from remaining components, rescaled to 100 (each weight divided by 80).
+        Show student note: "Mock interview not included. Your score is based on the other 80% of the readiness criteria."
+        The top-5 actions list must not suggest taking the interview while the flag is off.
+    - When the flag is on and the interview is taken:
+        Use the original 20% weight (weights sum to 100) and no note.
     """
+    if mock_interview_enabled is None:
+        mock_interview_enabled = getattr(config, "ENABLE_MOCK_INTERVIEW", False)
+
+    interview_data = component_inputs.get("mock_interview", {})
+    interview_taken = interview_data.get("score") is not None
+
+    use_rescaled = (not mock_interview_enabled) or (not interview_taken)
+    note = (
+        "Mock interview not included. Your score is based on the other 80% of the readiness criteria."
+        if use_rescaled
+        else None
+    )
+
     breakdown: Dict[str, ComponentBreakdown] = {}
     missing_components: List[str] = []
     completed_components: List[str] = []
@@ -118,12 +136,53 @@ def calculate_readiness_formula(
         summary = data.get("summary", "")
         checks = data.get("checks", [])
 
+        if key == "mock_interview":
+            if not mock_interview_enabled:
+                # Mock interview paused / disabled: excluded from calculation & missing list
+                breakdown[key] = ComponentBreakdown(
+                    name=name,
+                    weight=0.0,
+                    score=None,
+                    weighted_points=0.0,
+                    status="excluded",
+                    failed_checks_count=0,
+                    summary="Mock interview module is currently disabled.",
+                )
+                # DO NOT include in missing_components or actions when flag is off
+                continue
+            elif not interview_taken:
+                # Flag ON, but interview not taken: rescaled formula applies, note shown
+                missing_components.append(key)
+                breakdown[key] = ComponentBreakdown(
+                    name=name,
+                    weight=0.0,
+                    score=None,
+                    weighted_points=0.0,
+                    status="missing",
+                    failed_checks_count=0,
+                    summary=summary or "Technical mock interview not taken yet.",
+                )
+                # Suggest taking interview to unlock 20% weight when flag is ON
+                missing_action = _generate_missing_component_action(key, 20.0)
+                if missing_action:
+                    all_actions.append(missing_action)
+                continue
+            else:
+                # Flag ON and interview taken -> normal 20% weight
+                effective_weight = float(weight)
+        else:
+            # Remaining 6 components
+            if use_rescaled:
+                effective_weight = round((weight / 80.0) * 100.0, 2)
+            else:
+                effective_weight = float(weight)
+
         if raw_score is None:
             # Explicit missing component handling
             missing_components.append(key)
             breakdown[key] = ComponentBreakdown(
                 name=name,
-                weight=weight,
+                weight=effective_weight,
                 score=None,
                 weighted_points=0.0,
                 status="missing",
@@ -131,21 +190,23 @@ def calculate_readiness_formula(
                 summary=summary or f"{name} not completed or linked yet.",
             )
 
-            # Create an action item for this missing component
-            missing_action = _generate_missing_component_action(key, weight)
+            missing_action = _generate_missing_component_action(key, effective_weight)
             if missing_action:
                 all_actions.append(missing_action)
         else:
             completed_components.append(key)
             score_clamped = max(0.0, min(100.0, float(raw_score)))
-            weighted_pts = round(score_clamped * (weight / 100.0), 2)
+            if use_rescaled:
+                weighted_pts = round(score_clamped * (weight / 80.0), 2)
+            else:
+                weighted_pts = round(score_clamped * (weight / 100.0), 2)
             raw_total += weighted_pts
 
             failed_checks = [c for c in checks if not c.get("pass", c.get("passed", True))]
 
             breakdown[key] = ComponentBreakdown(
                 name=name,
-                weight=weight,
+                weight=effective_weight,
                 score=round(score_clamped, 1),
                 weighted_points=weighted_pts,
                 status="scored",
@@ -155,12 +216,19 @@ def calculate_readiness_formula(
 
             # Generate actionable items for each failed check
             for fc in failed_checks:
-                action = _generate_check_action(key, weight, fc)
+                action = _generate_check_action(key, effective_weight, fc)
                 if action:
                     all_actions.append(action)
 
     overall_score = max(0, min(100, int(round(raw_total))))
     level = get_placement_level(overall_score)
+
+    # Strictly ensure top-5 actions list does NOT suggest taking the interview while flag is off
+    if not mock_interview_enabled:
+        all_actions = [
+            a for a in all_actions
+            if not ("interview" in a.id.lower() or "interview" in a.component.lower())
+        ]
 
     # Sort actions descending by points_gained, break ties deterministically by ID
     all_actions.sort(key=lambda a: (a.points_gained, a.id), reverse=True)
@@ -170,6 +238,7 @@ def calculate_readiness_formula(
         "overall_score": overall_score,
         "raw_score": round(raw_total, 2),
         "level": level,
+        "note": note,
         "breakdown": breakdown,
         "missing_components": missing_components,
         "completed_components": completed_components,
@@ -177,7 +246,7 @@ def calculate_readiness_formula(
     }
 
 
-def _generate_missing_component_action(component_key: str, weight: int) -> ActionItem:
+def _generate_missing_component_action(component_key: str, weight: float) -> ActionItem:
     """Creates a high-priority action when an entire component is missing."""
     if component_key == "mock_interview":
         return ActionItem(
@@ -261,11 +330,11 @@ def _generate_missing_component_action(component_key: str, weight: int) -> Actio
 
 
 def _generate_check_action(
-    component_key: str, weight: int, check_dict: Dict[str, Any]
+    component_key: str, weight: float, check_dict: Dict[str, Any]
 ) -> Optional[ActionItem]:
     """
     Computes exact points gained in overall score:
-      points_gained = check_points_in_rubric * (weight / 100)
+      points_gained = check_points_in_rubric * (effective_weight / 100)
     """
     check_id = check_dict.get("id", "CHK-UNKNOWN")
     label = check_dict.get("label", check_id)
@@ -285,7 +354,7 @@ def _generate_check_action(
     elif component_key == "projects":
         rubric_points = 20
 
-    # Overall score delta = rubric_points * (weight / 100)
+    # Overall score delta = rubric_points * (effective_weight / 100)
     points_gained = round(rubric_points * (weight / 100.0), 2)
 
     return ActionItem(
@@ -560,16 +629,19 @@ def gather_component_data(db: Session, user_id: int) -> Dict[str, Dict[str, Any]
         }
 
     # 3. Mock Interview
-    interview_session = (
-        db.query(InterviewSession)
-        .filter(
-            InterviewSession.user_id == user_id,
-            InterviewSession.status == "completed",
-            InterviewSession.score.isnot(None),
+    is_interview_enabled = getattr(config, "ENABLE_MOCK_INTERVIEW", False)
+    interview_session = None
+    if is_interview_enabled:
+        interview_session = (
+            db.query(InterviewSession)
+            .filter(
+                InterviewSession.user_id == user_id,
+                InterviewSession.status == "completed",
+                InterviewSession.score.isnot(None),
+            )
+            .order_by(InterviewSession.id.desc())
+            .first()
         )
-        .order_by(InterviewSession.id.desc())
-        .first()
-    )
     if interview_session:
         int_checks = []
         fb = interview_session.feedback or {}
@@ -624,7 +696,7 @@ def gather_component_data(db: Session, user_id: int) -> Dict[str, Dict[str, Any]
         interview_data = {
             "score": None,
             "checks": [],
-            "summary": "Technical mock interview not taken yet.",
+            "summary": "Mock interview module is currently disabled." if not is_interview_enabled else "Technical mock interview not taken yet.",
         }
 
     # 4. GitHub Review
@@ -698,6 +770,8 @@ def compute_and_save_readiness_score(db: Session, user_id: int) -> ReadinessResp
     snapshot_payload = {
         "level": result["level"],
         "raw_score": result["raw_score"],
+        "note": result.get("note"),
+        "mock_interview_enabled": getattr(config, "ENABLE_MOCK_INTERVIEW", False),
         "components": serializable_breakdown,
         "missing_components": result["missing_components"],
         "completed_components": result["completed_components"],
@@ -724,6 +798,7 @@ def compute_and_save_readiness_score(db: Session, user_id: int) -> ReadinessResp
         overall_score=result["overall_score"],
         raw_score=result["raw_score"],
         level=result["level"],
+        note=result.get("note"),
         breakdown=result["breakdown"],
         missing_components=result["missing_components"],
         completed_components=result["completed_components"],
@@ -735,6 +810,7 @@ def compute_and_save_readiness_score(db: Session, user_id: int) -> ReadinessResp
 def get_current_readiness_score(db: Session, user_id: int) -> ReadinessResponse:
     """
     Fetches the latest snapshot or calculates and stores one if none exists.
+    Re-evaluates if the stored snapshot flag configuration is out of sync.
     """
     latest = (
         db.query(ReadinessScore)
@@ -746,6 +822,13 @@ def get_current_readiness_score(db: Session, user_id: int) -> ReadinessResponse:
         return compute_and_save_readiness_score(db, user_id)
 
     payload = latest.breakdown or {}
+    current_flag = getattr(config, "ENABLE_MOCK_INTERVIEW", False)
+    saved_flag = payload.get("mock_interview_enabled")
+    if saved_flag is not None and saved_flag != current_flag:
+        return compute_and_save_readiness_score(db, user_id)
+    if saved_flag is None and not current_flag:
+        return compute_and_save_readiness_score(db, user_id)
+
     components_dict = {}
     for k, v in payload.get("components", {}).items():
         components_dict[k] = ComponentBreakdown(**v)
@@ -758,6 +841,7 @@ def get_current_readiness_score(db: Session, user_id: int) -> ReadinessResponse:
         overall_score=latest.overall_score,
         raw_score=float(payload.get("raw_score", latest.overall_score)),
         level=payload.get("level", get_placement_level(latest.overall_score)),
+        note=payload.get("note"),
         breakdown=components_dict,
         missing_components=payload.get("missing_components", []),
         completed_components=payload.get("completed_components", []),

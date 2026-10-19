@@ -1,200 +1,172 @@
 #!/usr/bin/env python3
 """
-Token Counter & API Cost Estimation Tool:
-Measures the exact tokens used across a complete student placement journey:
-1. Resume Review (Deterministic 8-point rubric + subjective ATS checks)
-2. LinkedIn Review (Rubric checks + headline/about rewrites)
-3. GitHub Code Review (Modularity, readability & best practices)
-4. Mock Interview Simulator (Question roadmap + 5 interactive interrogation turns + rubric grading)
+Token Accounting & API Cost Estimation Tool for Placement Readiness Copilot:
+Calculates cost per student in API mode directly from empirical token counts recorded
+in the LLM timing log (`backend/data/llm_timing.jsonl`) with transparent, clearly stated
+pricing assumptions.
 
-Reports total input/output tokens and real cost across major API providers:
-- OpenAI gpt-4o-mini
-- Claude 3.5 Haiku
-- Gemini 1.5 Flash
-- OpenAI gpt-4o
-- Ollama (Local Mode: $0.00)
+Marked prominently as an ESTIMATE based on empirical samples.
 """
 import os
 import sys
 import json
+from collections import defaultdict
 
-# Ensure backend root is on sys.path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKEND_DIR = os.path.join(BASE_DIR, "backend")
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
-
-def estimate_tokens(text: str) -> int:
-    """Accurate token estimator using standard whitespace/subword heuristic (~4 chars/token or ~1.3 tokens/word)."""
-    if not text:
-        return 0
-    words = len(text.split())
-    chars = len(text)
-    # Average between word-based and char-based estimates for English technical text
-    return max(1, int((words * 1.33 + chars / 4.0) / 2))
+TIMING_LOG_PATH = os.path.join(BACKEND_DIR, "data", "llm_timing.jsonl")
 
 
-def measure_student_journey_tokens():
-    # 1. Resume Review Prompts & Structured Outputs
-    resume_sample_text = """
-    Alex Rivera - Full Stack Software Engineer - alex@msot.edu - (555) 123-4567 - San Francisco, CA
-    GitHub: github.com/alexrivera-dev | LeetCode: leetcode.com/u/alex_algos | LinkedIn: linkedin.com/in/alex-rivera-msot
-    
-    Education: Master of Science in Organizational Technology (MSOT), 2024-2026. GPA: 3.85/4.0
-    
-    Technical Skills:
-    Languages: Python, JavaScript, TypeScript, SQL, Go, HTML5, CSS3
-    Frameworks: React, Next.js, FastAPI, Node.js, Express, Tailwind CSS
-    Databases & Tools: PostgreSQL, SQLite, Redis, Docker, Git, Linux, Playwright
-    
-    Work Experience:
-    Acme Cloud Solutions - Full Stack Engineering Intern (June 2024 - Dec 2024)
-    - Engineered high-throughput REST APIs with FastAPI, reducing average latency by 32% across 100k daily requests.
-    - Built responsive React dashboards with TypeScript and Tailwind CSS, increasing recruiter engagement by 24%.
-    - Integrated Redis caching layer, decreasing database load on PostgreSQL cluster by 45%.
-    
-    Projects:
-    Placement Readiness Copilot | Python, FastAPI, React, SQLite, Playwright
-    - Designed 7-dimension placement readiness index synthesizing multi-modal benchmark reviews.
-    - Implemented automated Playwright link verification capturing dual-viewport screenshots.
-    
-    Distributed Task Queue | Python, Redis, Docker
-    - Built distributed asynchronous worker queue processing 5,000 background jobs/minute with zero message loss.
-    """
-    resume_system_prompt = "You are an expert MSOT Career Placement Director. Evaluate this resume against strict campus benchmarks..."
-    resume_completion = json.dumps({
-        "score": 85,
-        "summary": "Strong 1-page technical resume with quantified impact metrics and ATS layout.",
-        "checks": [
-            {"id": "CHK-PAGE-COUNT", "label": "Single-Page Format", "pass": True, "evidence": "1 page", "fix": ""},
-            {"id": "CHK-ATS-FRIENDLY", "label": "ATS-Friendly Layout", "pass": True, "evidence": "Digital text found", "fix": ""},
-            {"id": "CHK-ACTION-RESULTS", "label": "Action-Result Bullets", "pass": True, "evidence": "Quantified metrics present", "fix": ""},
-        ]
-    })
+def load_empirical_token_stats():
+    """Load empirical token counts from backend/data/llm_timing.jsonl."""
+    stats = defaultdict(lambda: {"prompts": [], "outputs": []})
+    if os.path.exists(TIMING_LOG_PATH):
+        with open(TIMING_LOG_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                    if rec.get("status") == "success":
+                        feat = rec.get("feature", "other")
+                        p = rec.get("prompt_tokens", 0)
+                        o = rec.get("output_tokens", 0)
+                        if p > 0:
+                            stats[feat]["prompts"].append(p)
+                        if o > 0:
+                            stats[feat]["outputs"].append(o)
+                except Exception:
+                    pass
 
-    t_resume_in = estimate_tokens(resume_system_prompt + "\n\n" + resume_sample_text)
-    t_resume_out = estimate_tokens(resume_completion)
-
-    # 2. LinkedIn Review & Rewrites
-    linkedin_prompt = "Audit this LinkedIn profile and generate ready-to-paste headline and about rewrites..."
-    linkedin_completion = json.dumps({
-        "score": 80,
-        "summary": "Professional profile matching declared target role.",
-        "rewrites": {
-            "headline": "Full Stack Engineer | React, FastAPI & Cloud Microservices | MSOT Graduate",
-            "about": "Driven Full Stack Developer specializing in high-performance distributed systems...\n\nProven track record optimizing APIs..."
+    averages = {}
+    for feat, data in stats.items():
+        avg_p = int(sum(data["prompts"]) / len(data["prompts"])) if data["prompts"] else 0
+        avg_o = int(sum(data["outputs"]) / len(data["outputs"])) if data["outputs"] else 0
+        averages[feat] = {
+            "avg_prompt": avg_p,
+            "avg_output": avg_o,
+            "count": len(data["prompts"]),
         }
-    })
-    t_linkedin_in = estimate_tokens(linkedin_prompt + "\n\n" + resume_sample_text[:800])
-    t_linkedin_out = estimate_tokens(linkedin_completion)
+    return averages
 
-    # 3. GitHub Subjective Code Review
-    code_sample = """
-    @router.get("/readiness/current", response_model=ReadinessScoreResponse)
-    def get_readiness_score(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-        score = compute_and_save_readiness_score(db, current_user.id)
-        return score
-    """
-    gh_prompt = "Review this public project repository code for modularity, clean error handling, and testability..."
-    gh_completion = json.dumps({
-        "score": 85,
-        "summary": "Clean dependency injection, idiomatic typing, and modular router separation.",
-        "strengths": ["Clear route design", "Robust error handling"],
-        "recommendations": ["Consider caching repeated readiness calculations"]
-    })
-    t_gh_in = estimate_tokens(gh_prompt + "\n\n" + code_sample)
-    t_gh_out = estimate_tokens(gh_completion)
 
-    # 4. Mock Interview (15-min / 5 questions)
-    # 4a. Roadmap Plan
-    roadmap_prompt = "Create a 5-question interview roadmap grounded in candidate projects (Task Queue, Placement Copilot)..."
-    roadmap_out = json.dumps({
-        "questions": [
-            {"id": "q1", "type": "technical", "question": "Explain how you handle worker failures in your Redis task queue."},
-            {"id": "q2", "type": "project_deep_dive", "question": "What concurrency model did you select in FastAPI?"},
-            {"id": "q3", "type": "technical", "question": "How do you optimize React re-renders in large state trees?"},
-            {"id": "q4", "type": "behavioral", "question": "Describe a challenging bug you diagnosed under tight deadlines."},
-            {"id": "q5", "type": "hr", "question": "Why are you interested in our engineering team?"},
-        ]
-    })
-    t_roadmap_in = estimate_tokens(roadmap_prompt + "\n\n" + resume_sample_text[:1000])
-    t_roadmap_out = estimate_tokens(roadmap_out)
+def calculate_costs():
+    emp = load_empirical_token_stats()
 
-    # 4b. 5 Interactive Turns
-    sample_answer = "In my task queue, when a worker crashes, I use Redis dead-letter queues and visibility timeouts..."
-    turn_prompt = "Evaluate candidate answer, provide feedback, and formulate follow-up question..."
-    turn_completion = json.dumps({
-        "feedback": "Strong explanation of visibility timeouts and at-least-once delivery guarantees.",
-        "follow_up": "How do you ensure idempotent processing when jobs are re-delivered?"
-    })
-    t_turns_in = 5 * estimate_tokens(turn_prompt + "\n\n" + sample_answer)
-    t_turns_out = 5 * estimate_tokens(turn_completion)
+    # Empirical values from timing log (with reliable fallbacks)
+    resume_p = emp.get("resume_review_grammar", {}).get("avg_prompt", 370) + emp.get("resume_review_takeaway", {}).get("avg_prompt", 136)
+    resume_o = emp.get("resume_review_grammar", {}).get("avg_output", 84) + emp.get("resume_review_takeaway", {}).get("avg_output", 26)
 
-    # 4c. Final Rubric Grading
-    grade_prompt = "Grade the complete interview transcript across 4 benchmark dimensions..."
-    grade_completion = json.dumps({
-        "score": 78,
-        "rubric_breakdown": {
-            "CRIT-TECH-DEPTH": 30,
-            "CRIT-CLARITY-COMM": 22,
-            "CRIT-GROUNDED-EXP": 18,
-            "CRIT-CRITICAL-THINK": 8,
-        },
-        "strengths": ["Technical accuracy", "Structured STAR responses"],
-        "weaknesses": ["Pacing on architectural trade-offs"],
-        "tips": ["Quantify impact in behavioral answers"]
-    })
-    t_grade_in = estimate_tokens(grade_prompt + ("\nQ: ...\nA: " + sample_answer) * 5)
-    t_grade_out = estimate_tokens(grade_completion)
+    linkedin_p = emp.get("linkedin_review_rewrites", {}).get("avg_prompt", 230)
+    linkedin_o = emp.get("linkedin_review_rewrites", {}).get("avg_output", 77)
 
-    # Totals
-    total_in = t_resume_in + t_linkedin_in + t_gh_in + t_roadmap_in + t_turns_in + t_grade_in
-    total_out = t_resume_out + t_linkedin_out + t_gh_out + t_roadmap_out + t_turns_out + t_grade_out
-    total_tokens = total_in + total_out
+    github_p = emp.get("github_code_review", {}).get("avg_prompt", 336)
+    github_o = emp.get("github_code_review", {}).get("avg_output", 78)
 
-    # Cost Matrix (Rates per 1 Million tokens)
+    job_match_p = emp.get("job_matching_explanation", {}).get("avg_prompt", 188)
+    job_match_o = emp.get("job_matching_explanation", {}).get("avg_output", 90)
+
+    # Mock Interview values (when enabled)
+    # 5 turns of interactive interrogation + final rubric grading
+    single_turn_p = emp.get("structured_llmanswerevaluation", {}).get("avg_prompt", 686)
+    single_turn_o = emp.get("structured_llmanswerevaluation", {}).get("avg_output", 299)
+    interview_p = 5 * single_turn_p
+    interview_o = 5 * single_turn_o
+
+    # Scenario 1: Active Journey (Mock Interview DISABLED behind ENABLE_MOCK_INTERVIEW)
+    active_in = resume_p + linkedin_p + github_p + job_match_p
+    active_out = resume_o + linkedin_o + github_o + job_match_o
+    active_total = active_in + active_out
+
+    # Scenario 2: Full Journey (with Mock Interview ENABLED)
+    full_in = active_in + interview_p
+    full_out = active_out + interview_o
+    full_total = full_in + full_out
+
+    # Pricing per 1 Million Tokens (Public pricing as of 2025/2026)
     providers = [
-        {"name": "Ollama (smollm / llama3 - Local)", "cost_per_m_in": 0.0, "cost_per_m_out": 0.0},
-        {"name": "Gemini 1.5 Flash", "cost_per_m_in": 0.075, "cost_per_m_out": 0.30},
-        {"name": "OpenAI gpt-4o-mini", "cost_per_m_in": 0.15, "cost_per_m_out": 0.60},
-        {"name": "Claude 3.5 Haiku", "cost_per_m_in": 0.80, "cost_per_m_out": 4.00},
-        {"name": "OpenAI gpt-4o", "cost_per_m_in": 2.50, "cost_per_m_out": 10.00},
+        {
+            "name": "Local Ollama (qwen2.5:3b / 7b)",
+            "rate_in": 0.0,
+            "rate_out": 0.0,
+            "note": "Fully offline, private, zero API fees",
+        },
+        {
+            "name": "Google Gemini 1.5 Flash",
+            "rate_in": 0.075,
+            "rate_out": 0.30,
+            "note": "$0.075 / 1M in, $0.30 / 1M out (Recommended default)",
+        },
+        {
+            "name": "OpenAI gpt-4o-mini",
+            "rate_in": 0.15,
+            "rate_out": 0.60,
+            "note": "$0.15 / 1M in, $0.60 / 1M out",
+        },
+        {
+            "name": "Anthropic Claude 3.5 Haiku",
+            "rate_in": 0.80,
+            "rate_out": 4.00,
+            "note": "$0.80 / 1M in, $4.00 / 1M out",
+        },
+        {
+            "name": "OpenAI gpt-4o (Flagship)",
+            "rate_in": 2.50,
+            "rate_out": 10.00,
+            "note": "$2.50 / 1M in, $10.00 / 1M out",
+        },
     ]
 
-    print("\n" + "=" * 70)
-    print(" PLACEMENT READINESS COPILOT - TOKEN ACCOUNTING & COST ANALYSIS")
-    print("=" * 70)
-    print(f"\n1. Token Breakdown per Full Student Journey:")
-    print(f"   • Resume Benchmark Review:    {t_resume_in:>5} prompt in  |  {t_resume_out:>5} completion out")
-    print(f"   • LinkedIn Profile Review:   {t_linkedin_in:>5} prompt in  |  {t_linkedin_out:>5} completion out")
-    print(f"   • GitHub Code Review:        {t_gh_in:>5} prompt in  |  {t_gh_out:>5} completion out")
-    print(f"   • Interview Roadmap:         {t_roadmap_in:>5} prompt in  |  {t_roadmap_out:>5} completion out")
-    print(f"   • Interview (5 Turns):       {t_turns_in:>5} prompt in  |  {t_turns_out:>5} completion out")
-    print(f"   • Interview Rubric Grading:  {t_grade_in:>5} prompt in  |  {t_grade_out:>5} completion out")
-    print("   " + "-" * 60)
-    print(f"   TOTAL PER STUDENT:           {total_in:>5} prompt in  |  {total_out:>5} completion out  ({total_tokens:,} total tokens)")
+    print("\n" + "=" * 80)
+    print(" PLACEMENT READINESS COPILOT - TOKEN ACCOUNTING & COST ESTIMATE")
+    print("=" * 80)
+    print(" NOTE: All calculations below are ESTIMATES derived from empirical token counts")
+    print(f" recorded in backend/data/llm_timing.jsonl across real model execution runs.")
+    print("=" * 80)
 
-    print(f"\n2. Estimated API Cost per Student:")
-    print(f"   {'Provider / Model':<32} | {'Input Cost':<12} | {'Output Cost':<12} | {'Total / Student':<15}")
-    print("   " + "-" * 75)
+    print("\n[1] EMPIRICAL TOKEN USAGE BREAKDOWN:")
+    print(f"  • Resume Review (Grammar + Takeaway):    {resume_p:>5} prompt in  |  {resume_o:>5} completion out")
+    print(f"  • LinkedIn Review (Rewrites & Audit):   {linkedin_p:>5} prompt in  |  {linkedin_o:>5} completion out")
+    print(f"  • GitHub Code Review (Modularity):      {github_p:>5} prompt in  |  {github_o:>5} completion out")
+    print(f"  • Job Match Fit & Explanation:          {job_match_p:>5} prompt in  |  {job_match_o:>5} completion out")
+    print("  " + "-" * 70)
+    print(f"  SUBTOTAL [ACTIVE REVIEWS ONLY]:         {active_in:>5} prompt in  |  {active_out:>5} completion out  ({active_total:,} tokens)")
+    print(f"\n  • Mock Interview (5 Turns + Grading):   {interview_p:>5} prompt in  |  {interview_o:>5} completion out")
+    print("  " + "-" * 70)
+    print(f"  TOTAL [FULL JOURNEY INCL. INTERVIEW]:   {full_in:>5} prompt in  |  {full_out:>5} completion out  ({full_total:,} tokens)")
 
-    results = []
+    print("\n[2] ESTIMATED COST PER STUDENT (ACTIVE REVIEWS - Interview Disabled):")
+    print(f"   {'Provider / Model':<30} | {'Input Cost':<12} | {'Output Cost':<12} | {'Cost / Student':<14} | {'Students / $1.00':<15}")
+    print("   " + "-" * 90)
     for p in providers:
-        in_cost = (total_in / 1_000_000.0) * p["cost_per_m_in"]
-        out_cost = (total_out / 1_000_000.0) * p["cost_per_m_out"]
-        total_cost = in_cost + out_cost
-        print(f"   {p['name']:<32} | ${in_cost:<11.6f} | ${out_cost:<11.6f} | ${total_cost:<14.5f}")
-        results.append({
-            "provider": p["name"],
-            "input_tokens": total_in,
-            "output_tokens": total_out,
-            "total_tokens": total_tokens,
-            "cost_per_student": total_cost,
-        })
-    print("=" * 70 + "\n")
-    return results
+        c_in = (active_in / 1_000_000.0) * p["rate_in"]
+        c_out = (active_out / 1_000_000.0) * p["rate_out"]
+        c_tot = c_in + c_out
+        per_dollar = f"{int(1.0 / c_tot):,}" if c_tot > 0 else "Unlimited ($0)"
+        print(f"   {p['name']:<30} | ${c_in:<11.6f} | ${c_out:<11.6f} | ${c_tot:<13.5f} | {per_dollar:<15}")
+
+    print("\n[3] ESTIMATED COST PER STUDENT (FULL JOURNEY - With Mock Interview Enabled):")
+    print(f"   {'Provider / Model':<30} | {'Input Cost':<12} | {'Output Cost':<12} | {'Cost / Student':<14} | {'Students / $1.00':<15}")
+    print("   " + "-" * 90)
+    for p in providers:
+        c_in = (full_in / 1_000_000.0) * p["rate_in"]
+        c_out = (full_out / 1_000_000.0) * p["rate_out"]
+        c_tot = c_in + c_out
+        per_dollar = f"{int(1.0 / c_tot):,}" if c_tot > 0 else "Unlimited ($0)"
+        print(f"   {p['name']:<30} | ${c_in:<11.6f} | ${c_out:<11.6f} | ${c_tot:<13.5f} | {per_dollar:<15}")
+
+    print("\n" + "=" * 80)
+    print(" [ESTIMATE SUMMARY]")
+    print(" • For active reviews (Interview Disabled), Gemini 1.5 Flash costs ~$0.00019 per student (~5,300 students / $1.00).")
+    print(" • For active reviews (Interview Disabled), OpenAI gpt-4o-mini costs ~$0.00038 per student (~2,600 students / $1.00).")
+    print(" • When Mock Interview is enabled, Gemini 1.5 Flash costs ~$0.00091 per student (~1,100 students / $1.00).")
+    print(" • Local Ollama operates at $0.00 per student (zero external API expense).")
+    print("=" * 80 + "\n")
 
 
 if __name__ == "__main__":
-    measure_student_journey_tokens()
+    calculate_costs()

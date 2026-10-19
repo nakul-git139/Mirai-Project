@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+import pytest
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -36,7 +37,29 @@ def submit_auth_and_wait(page):
         raise e
 
 
-def test_browser_e2e_tracker_and_admin_flow():
+@pytest.fixture
+def cleanup_e2e_records():
+    emails = []
+    yield emails
+    try:
+        from app.database import SessionLocal
+        from app.models import User, Profile, ReadinessScore, Job, Application
+        with SessionLocal() as db_session:
+            for email in emails:
+                u = db_session.query(User).filter(User.email == email).first()
+                if u:
+                    db_session.query(Application).filter(Application.user_id == u.id).delete()
+                    db_session.query(Profile).filter(Profile.user_id == u.id).delete()
+                    db_session.query(ReadinessScore).filter(ReadinessScore.user_id == u.id).delete()
+                    db_session.query(Job).filter(Job.posted_by_user_id == u.id).delete()
+                    db_session.delete(u)
+            db_session.commit()
+            print("\n✓ Cleaned up test user accounts, profiles, jobs, and applications.")
+    except Exception as e:
+        print(f"Cleanup notice: {e}")
+
+
+def test_browser_e2e_tracker_and_admin_flow(cleanup_e2e_records=None):
     """
     Dual-session browser verification using Playwright:
     1. Admin logs in, posts job with eligibility criteria (React, TypeScript, 70 score).
@@ -52,7 +75,16 @@ def test_browser_e2e_tracker_and_admin_flow():
     ineligible_email = f"ineligible_{run_id}@msot.ac.in"
     password = "password123"
 
+    if cleanup_e2e_records is not None:
+        cleanup_e2e_records.extend([admin_email, eligible_email, ineligible_email])
+
     job_title = f"Full Stack Campus Fellow {run_id}"
+
+    import urllib.request
+    try:
+        urllib.request.urlopen(FRONTEND_URL, timeout=1)
+    except Exception:
+        pytest.skip(f"Frontend dev server not running at {FRONTEND_URL}")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -332,4 +364,23 @@ def test_browser_e2e_tracker_and_admin_flow():
 
 
 if __name__ == "__main__":
-    test_browser_e2e_tracker_and_admin_flow()
+    records = []
+    try:
+        test_browser_e2e_tracker_and_admin_flow(records)
+    finally:
+        try:
+            from app.database import SessionLocal
+            from app.models import User, Profile, ReadinessScore, Job, Application
+            with SessionLocal() as db_session:
+                for email in records:
+                    u = db_session.query(User).filter(User.email == email).first()
+                    if u:
+                        db_session.query(Application).filter(Application.user_id == u.id).delete()
+                        db_session.query(Profile).filter(Profile.user_id == u.id).delete()
+                        db_session.query(ReadinessScore).filter(ReadinessScore.user_id == u.id).delete()
+                        db_session.query(Job).filter(Job.posted_by_user_id == u.id).delete()
+                        db_session.delete(u)
+                db_session.commit()
+                print("✓ Cleaned up test user accounts, profiles, jobs, and applications.")
+        except Exception as e:
+            print(f"Cleanup notice: {e}")

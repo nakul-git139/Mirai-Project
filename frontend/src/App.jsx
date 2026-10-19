@@ -47,6 +47,8 @@ export default function App() {
     setCurrentUser(user);
   };
 
+  const enableMockInterview = settings?.enable_mock_interview ?? false;
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-900 text-slate-100 font-sans">
       {/* Sidebar Navigation */}
@@ -56,6 +58,7 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenAuth={() => setIsAuthOpen(true)}
+        enableMockInterview={enableMockInterview}
       />
 
       {/* Main Content Area */}
@@ -75,7 +78,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'interview' && (
+        {activeTab === 'interview' && enableMockInterview && (
           <MockInterviewPage
             currentUser={currentUser}
             onNavigateTab={setActiveTab}
@@ -86,6 +89,7 @@ export default function App() {
           <ReadinessScorePage
             currentUser={currentUser}
             onNavigateTab={setActiveTab}
+            enableMockInterview={enableMockInterview}
           />
         )}
 

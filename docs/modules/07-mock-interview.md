@@ -245,3 +245,18 @@ make test
 
 ### Shortcuts & Faked Parts
 - **Zero Faked Parts**: Real audio files transcribed with actual local `faster-whisper` neural network inference. No mock models used in voice tests; actual WAV audio was synthesized and verified with 100.0% accuracy.
+
+---
+
+## [2026-10-18] Changes: Module Paused via ENABLE_MOCK_INTERVIEW
+
+### 1. Summary of Changes
+- Introduced `ENABLE_MOCK_INTERVIEW` configuration flag in `backend/app/config.py` (default: `False`).
+- Sourced dynamically from environment variable: `ENABLE_MOCK_INTERVIEW=os.environ.get("ENABLE_MOCK_INTERVIEW", "false").lower() in ("true", "1", "yes")`.
+- When flag is `False`:
+  - Disables all endpoints in `backend/app/routers/interview.py` (`POST /start`, `GET /active`, `GET /history`, `GET /{id}`, `POST /{id}/message`, `POST /transcribe`, `POST /{id}/voice-message`, `POST /{id}/end`, `GET /{id}/replay`), returning `HTTP 400 Bad Request` with `{"detail": "Mock interview feature is not enabled."}`.
+  - Hides the Mock Interview navigation item from `frontend/src/components/Sidebar.jsx`.
+  - Disables routing to `MockInterviewPage` in `frontend/src/App.jsx`.
+- Code, models, voice services, and unit test suites are fully preserved and remain intact for future resumption.
+- When flag is `True`:
+  - All original interview and voice routes operate normally.

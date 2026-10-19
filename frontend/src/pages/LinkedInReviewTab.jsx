@@ -17,6 +17,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { api } from '../api';
+import OllamaProgressIndicator from '../components/OllamaProgressIndicator';
+import JobProgressIndicator from '../components/JobProgressIndicator';
 
 function LinkedinIcon({ className = "w-4 h-4" }) {
   return (
@@ -31,6 +33,7 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
   const [review, setReview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [runningReview, setRunningReview] = useState(false);
+  const [activeJobId, setActiveJobId] = useState(() => localStorage.getItem('active_job_linkedin_review') || null);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all'); // all, failed, passed
   const [inputMode, setInputMode] = useState('upload'); // upload, paste
@@ -39,6 +42,11 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
 
   useEffect(() => {
     loadLatestReview();
+    const savedJob = localStorage.getItem('active_job_linkedin_review');
+    if (savedJob) {
+      setActiveJobId(savedJob);
+      setRunningReview(true);
+    }
   }, [currentUser]);
 
   const loadLatestReview = async () => {
@@ -66,11 +74,16 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
     setRunningReview(true);
     setError(null);
     try {
-      const res = await api.triggerLinkedInReviewPdf(fileToUpload);
-      setReview(res);
+      const res = await api.triggerLinkedInReviewAsync(fileToUpload, null);
+      setActiveJobId(res.id);
+      localStorage.setItem('active_job_linkedin_review', res.id);
     } catch (err) {
-      setError(err.message || 'Failed to execute LinkedIn PDF review.');
-    } finally {
+      if (err.status === 429) {
+        const retry = err.data?.detail?.retry_after || err.data?.retry_after || 60;
+        setError(`Rate limit reached: Maximum reviews per hour exceeded. Please retry after ${retry} seconds.`);
+      } else {
+        setError(err.message || 'Failed to execute LinkedIn PDF review.');
+      }
       setRunningReview(false);
     }
   };
@@ -83,11 +96,16 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
     setRunningReview(true);
     setError(null);
     try {
-      const res = await api.triggerLinkedInReviewText(pastedText);
-      setReview(res);
+      const res = await api.triggerLinkedInReviewAsync(null, pastedText);
+      setActiveJobId(res.id);
+      localStorage.setItem('active_job_linkedin_review', res.id);
     } catch (err) {
-      setError(err.message || 'Failed to execute LinkedIn text review.');
-    } finally {
+      if (err.status === 429) {
+        const retry = err.data?.detail?.retry_after || err.data?.retry_after || 60;
+        setError(`Rate limit reached: Maximum reviews per hour exceeded. Please retry after ${retry} seconds.`);
+      } else {
+        setError(err.message || 'Failed to execute LinkedIn text review.');
+      }
       setRunningReview(false);
     }
   };
@@ -155,22 +173,20 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
             <button
               id="btn-mode-pdf"
               onClick={() => setInputMode('upload')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                inputMode === 'upload'
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${inputMode === 'upload'
                   ? 'bg-sky-500 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               Upload PDF Export
             </button>
             <button
               id="btn-mode-paste"
               onClick={() => setInputMode('paste')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                inputMode === 'paste'
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${inputMode === 'paste'
                   ? 'bg-sky-500 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               Paste Profile Text
             </button>
@@ -255,6 +271,28 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
         </div>
       )}
 
+      {/* Running Review Progress Indicator */}
+      {runningReview && activeJobId ? (
+        <JobProgressIndicator
+          jobId={activeJobId}
+          taskType="linkedin_review"
+          featureTitle="LinkedIn Benchmark Review"
+          onComplete={(res) => {
+            setReview(res);
+            setActiveJobId(null);
+            setRunningReview(false);
+          }}
+          onError={(err) => {
+            setError(err);
+            setActiveJobId(null);
+            setRunningReview(false);
+          }}
+        />
+      ) : runningReview && (
+        <OllamaProgressIndicator featureName="LinkedIn Placement Benchmark Review" />
+      )}
+
+
       {/* Loading Skeleton */}
       {loading && (
         <div className="text-center py-12 space-y-3">
@@ -296,9 +334,8 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
                   <div className="flex items-center gap-2">
                     <span
                       id="linkedin-tier-badge"
-                      className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                        getScoreBadge(review.score).color
-                      }`}
+                      className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${getScoreBadge(review.score).color
+                        }`}
                     >
                       {getScoreBadge(review.score).label}
                     </span>
@@ -422,31 +459,28 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
               <div className="flex items-center space-x-1 bg-slate-950 border border-slate-800 rounded-xl p-1 self-start sm:self-auto">
                 <button
                   onClick={() => setFilter('all')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                    filter === 'all'
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${filter === 'all'
                       ? 'bg-slate-800 text-white'
                       : 'text-slate-400 hover:text-slate-200'
-                  }`}
+                    }`}
                 >
                   All ({checks.length})
                 </button>
                 <button
                   onClick={() => setFilter('failed')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                    filter === 'failed'
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${filter === 'failed'
                       ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                       : 'text-slate-400 hover:text-rose-300'
-                  }`}
+                    }`}
                 >
                   Fixes Needed ({failedCount})
                 </button>
                 <button
                   onClick={() => setFilter('passed')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                    filter === 'passed'
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${filter === 'passed'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                       : 'text-slate-400 hover:text-emerald-300'
-                  }`}
+                    }`}
                 >
                   Passed ({passedCount})
                 </button>
@@ -461,11 +495,10 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
                   <div
                     key={chk.id}
                     id={`check-${chk.id}`}
-                    className={`rounded-2xl p-5 border transition-all ${
-                      isPassed
+                    className={`rounded-2xl p-5 border transition-all ${isPassed
                         ? 'bg-slate-950/60 border-slate-800/80 hover:border-emerald-500/30'
                         : 'bg-slate-950/80 border-rose-500/30 hover:border-rose-500/50 shadow-lg shadow-rose-950/20'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start space-x-3.5">
@@ -492,16 +525,14 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
 
                           {/* Specific Actionable Fix */}
                           <div
-                            className={`text-xs rounded-xl p-3 border space-y-1 ${
-                              isPassed
+                            className={`text-xs rounded-xl p-3 border space-y-1 ${isPassed
                                 ? 'bg-slate-900/40 border-slate-800 text-slate-400'
                                 : 'bg-rose-500/10 border-rose-500/30 text-rose-200 font-medium'
-                            }`}
+                              }`}
                           >
                             <span
-                              className={`text-[10px] font-bold uppercase tracking-wider block ${
-                                isPassed ? 'text-slate-500' : 'text-rose-400'
-                              }`}
+                              className={`text-[10px] font-bold uppercase tracking-wider block ${isPassed ? 'text-slate-500' : 'text-rose-400'
+                                }`}
                             >
                               Specific Actionable Fix
                             </span>
@@ -511,11 +542,10 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
                       </div>
 
                       <span
-                        className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border shrink-0 ${
-                          isPassed
+                        className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border shrink-0 ${isPassed
                             ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                             : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                        }`}
+                          }`}
                       >
                         {isPassed ? 'Pass' : 'Needs Fix'}
                       </span>

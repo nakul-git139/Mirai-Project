@@ -162,8 +162,23 @@ $$\sum_{i=1}^{7} \text{Weight}_i = 100\%$$
 - **50 – 74**: **Almost ready** (Solid technical baseline; within 3–5 targeted actions of clearance).
 - **75 – 100**: **Placement ready** (Cleared for campus placement drives and enterprise recruitment).
 
-#### Missing Components Policy
-If a dimension is incomplete, $\text{Score}_i = \text{null}$, contributing $0.0$ to the composite sum without throwing runtime exceptions. Missing dimensions generate prioritized action items with immediate potential gain $\Delta = \text{Weight}_i$ (e.g., completing an unattempted interview yields $+20$ points).
+#### Missing Components Policy & Dynamic Rescaling Rule
+- **Baseline (Interview Present & Enabled)**: When `ENABLE_MOCK_INTERVIEW` is `True` and the interview is completed, the composite score uses the standard 7-dimension weights summing to 100% (Mock Interview = 20%).
+- **Dynamic Rescaling (Interview Disabled or Absent)**: When the mock interview is **not enabled** (`ENABLE_MOCK_INTERVIEW=False`) or **not taken** by the candidate:
+  - The score is calculated exclusively from the remaining 6 components, rescaled to 100 by dividing each component's base weight by 80:
+    $$\text{Rescaled Weight}_i = \frac{\text{Weight}_i}{80} \times 100\%$$
+    $$\text{Overall Score} = \sum_{i \in \text{remaining}} \left( \text{Score}_i \times \frac{\text{Weight}_i}{80} \right)$$
+  - Rescaled dimension weights:
+    - Resume: $25 / 80 = \mathbf{31.25\%}$
+    - Projects: $25 / 80 = \mathbf{31.25\%}$
+    - GitHub Presence: $10 / 80 = \mathbf{12.50\%}$
+    - Coding Practice: $10 / 80 = \mathbf{12.50\%}$
+    - LinkedIn Profile: $5 / 80 = \mathbf{6.25\%}$
+    - Co-curricular: $5 / 80 = \mathbf{6.25\%}$
+    - Mock Interview: $\mathbf{0.00\%}$ (Excluded / Paused)
+  - **Student Notification Note**: In this mode, the system surfaces a clear note in the API response and UI:
+    > *"Mock interview not included. Your score is based on the other 80% of the readiness criteria."*
+  - **Top Actions Policy**: When `ENABLE_MOCK_INTERVIEW` is `False`, the top-5 actions list strictly omits mock interview recommendations. If incomplete dimensions among the remaining 6 exist, $\text{Score}_i = \text{null}$, contributing $0.0$ to the composite sum without throwing runtime exceptions.
 
 ---
 
@@ -246,3 +261,62 @@ These format pre-populated deep links that students launch directly in their aut
   ```
 - **Concurrency Benefit**: Readers execute concurrently without acquiring table locks, allowing hundreds of concurrent student sessions to read readiness scores, profile data, and job boards while background workers persist interview turns.
 - **Single-Command Developer Ergonomics**: The entire stack bootstraps via `make dev`, launching the Uvicorn ASGI server and Vite React development server simultaneously. Full verification executes via `make test`.
+
+---
+
+### 2.7 Background Jobs, Concurrency Limits & Rate Limiting
+
+1. **Background Job Queuing (`services/job_queue.py`)**:
+   - Long LLM tasks (resume review, LinkedIn review, GitHub evaluation, live-link summaries, job matching) run asynchronously in a dedicated `ThreadPoolExecutor`.
+   - Endpoint returns immediate HTTP 202 with `job_id`, status (`queued`), and dynamic queue position.
+   - Frontend polls `GET /api/jobs/status/{job_id}` with persistent state in `localStorage` surviving browser reloads.
+2. **Per-Provider Concurrency Limiting (`threading.Semaphore`)**:
+   - Provider concurrency managed via semaphores:
+     - **Ollama**: Default limit 1 (sequential queue protecting CPU/host stability).
+     - **Hosted APIs** (OpenAI, Claude, Gemini, Mock): Default limit 10 (parallel throughput).
+   - Configurable dynamically via `settings.json`, environment variables (`LLM_CONCURRENCY_<PROVIDER>`), or admin settings.
+3. **Per-Student Rolling Rate Limiting**:
+   - Sliding-window rate limiting enforcing maximum reviews per hour (default 10 reviews/hour) per student.
+   - Over-limit requests receive HTTP 429 Too Many Requests with standard `Retry-After` header and remaining seconds. Strict tenant isolation ensures other students are unaffected.
+4. **Resilient Failure Handling & Admin Dashboard**:
+   - Cloud adapters use exponential backoff retries with jitter on HTTP 429 and timeouts.
+   - Unreachable hosts fail cleanly with actionable user messages without blocking subsequent queued jobs.
+   - Admin telemetry dashboard (`/api/admin/llm-queue`) displays real-time queue length, running jobs, per-provider concurrency limits, and recent LLM execution timings.
+
+---
+
+### 2.8 Deployment & Performance
+
+#### 1. Hardware Benchmarks & Measured Inference Speed
+All local Ollama benchmarks were measured on a physical, CPU-only laptop (**AMD Ryzen 7 3700U with Radeon Vega Mobile Gfx, 4 cores / 8 threads, 16 GB DDR4 RAM**):
+- **Ollama (`qwen2.5:3b`) on CPU**: Sustained generation speed of **~5 tokens/second**.
+  - **Resume Grammar Audit**: 4.26s – 13.92s wall-clock duration (310 prompt tokens, 39 output tokens).
+  - **LinkedIn Rewrites**: 18.13s wall-clock duration (273 prompt tokens, 77 output tokens).
+  - **GitHub Codebase Audit**: 7.58s – 12.28s wall-clock duration (333 prompt tokens, 63 output tokens).
+- **Strict Factuality**: No speed figures or capacity promises are made for untested hardware. Production sizing must be validated empirically on target infrastructure.
+
+#### 2. Architecture Recommendation: Hosted API vs. Local Ollama
+- **Multi-Student Cohort Production Default**: **Hosted API (Google Gemini 1.5 Flash or OpenAI gpt-4o-mini)** is strongly recommended as the default deployment strategy for campus placement cohorts.
+  - **Cost-Efficiency**: Empirical measurements confirm that Gemini 1.5 Flash costs approximately **$0.00020 per student** (~5,000 students per $1.00) in active review mode, delivering sub-second response times and effortless parallel scaling.
+  - **Concurrency**: Cloud providers handle hundreds of simultaneous candidate reviews without queue congestion.
+- **Local / Private Use**: **Local Ollama** (`qwen2.5:3b` / `7b`) is maintained as a zero-cost, air-gapped, privacy-preserving option for single-user local development or students without external API keys.
+
+#### 3. Concurrency Control, Queuing & Rate Limiting
+To prevent CPU saturation and host instability, background jobs are queued and throttled:
+- **Asynchronous Worker Pool**: Non-blocking `ThreadPoolExecutor` accepts review jobs, returning immediate HTTP 202 with `job_id` and position.
+- **Per-Provider Concurrency Semaphores**:
+  - **Ollama**: Semaphore limit = **1** (strictly sequential execution protecting CPU/RAM from multi-process thrashing).
+  - **Hosted APIs / Mock**: Semaphore limit = **10** (concurrent parallel dispatch).
+- **Per-Student Rolling Rate Limits**: Sliding-window rate limiter restricts candidates to **10 review requests per hour** (`429 Too Many Requests` with `Retry-After: 3600`). Tenant isolation ensures other students' queues are entirely unaffected.
+
+#### 4. Hardware Sizing Checklist for Institutional Adoption
+Before deploying campus-wide, institutional IT / placement leadership should answer:
+1. **Concurrent Peak Volume**: How many students will execute reviews simultaneously during placement deadlines (e.g., 50, 200, 1,000)?
+2. **Compute Topology**: Will the institution provision dedicated GPU instances (e.g., NVIDIA A10G / T4 / L4 with vLLM / Ollama), or utilize managed enterprise cloud APIs (Gemini / OpenAI Azure / Bedrock)?
+3. **Data Egress & Compliance**: Does student data policy require 100% on-premises execution (mandatory local Ollama on institutional hardware), or is outbound SOC2/FERPA-compliant cloud LLM usage permitted?
+4. **Bandwidth & Networking**: Can the server sustain external HTTP lookups to Greenhouse/Lever APIs, or will job discovery run with pre-cached/internal MSOT institutional postings?
+
+#### 5. Feature Status & Readiness Rescaling
+- **Mock Interview Status**: Fully implemented with both text and local Whisper voice transcription (`/api/interview`), but intentionally **disabled behind `ENABLE_MOCK_INTERVIEW=False`** for submission focus.
+- **80% Rescaling Rule**: With the 20% mock interview dimension paused, candidate readiness is computed over the remaining 6 dimensions and rescaled by dividing by 0.80 ($\text{Score} / 0.80$), preserving full 0–100 fidelity without penalizing students.
+

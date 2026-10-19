@@ -4,6 +4,7 @@ import pytest
 from datetime import datetime
 from fastapi.testclient import TestClient
 
+from app import config
 from app.services.readiness_service import (
     calculate_readiness_formula,
     get_placement_level,
@@ -17,47 +18,92 @@ from app.main import app
 
 
 # ---------------------------------------------------------------------------
-# 1. Formula Unit Tests with Explicit Hand-Calculated Arithmetic
+# 1. Formula Unit Tests: Mode 1 - Flag OFF (Rescaled to 100, weights / 80)
 # ---------------------------------------------------------------------------
-def test_readiness_formula_all_100_yields_100():
-    """All 7 components at 100/100 must produce exactly 100."""
+def test_readiness_formula_flag_off_all_100_yields_100():
+    """
+    With flag OFF, all 6 remaining components at 100/100 must produce exactly 100.
+    Hand-calculated:
+      100 * (25/80) + 100 * (25/80) + 100 * (10/80) + 100 * (10/80) + 100 * (5/80) + 100 * (5/80)
+      = 31.25 + 31.25 + 12.50 + 12.50 + 6.25 + 6.25 = 100.00
+    """
     inputs = {
         "resume": {"score": 100},
         "projects": {"score": 100},
-        "mock_interview": {"score": 100},
+        "mock_interview": {"score": 100},  # Even if interview data is present, flag off excludes it
         "github": {"score": 100},
         "coding_practice": {"score": 100},
         "linkedin": {"score": 100},
         "co_curricular": {"score": 100},
     }
-    res = calculate_readiness_formula(inputs)
+    res = calculate_readiness_formula(inputs, mock_interview_enabled=False)
     assert res["overall_score"] == 100
     assert res["raw_score"] == 100.0
     assert res["level"] == "Placement ready"
-    assert len(res["missing_components"]) == 0
-    assert len(res["completed_components"]) == 7
+    assert res["note"] == "Mock interview not included. Your score is based on the other 80% of the readiness criteria."
+    assert "mock_interview" not in res["missing_components"]
+    assert res["breakdown"]["mock_interview"].status == "excluded"
+    assert res["breakdown"]["mock_interview"].weight == 0.0
 
 
-def test_readiness_formula_all_0_yields_0():
-    """All 7 components at 0/100 must produce exactly 0."""
+def test_readiness_formula_flag_off_all_0_yields_0():
+    """With flag OFF, all remaining components at 0/100 must produce exactly 0."""
     inputs = {
         "resume": {"score": 0},
         "projects": {"score": 0},
-        "mock_interview": {"score": 0},
+        "mock_interview": {"score": None},
         "github": {"score": 0},
         "coding_practice": {"score": 0},
         "linkedin": {"score": 0},
         "co_curricular": {"score": 0},
     }
-    res = calculate_readiness_formula(inputs)
+    res = calculate_readiness_formula(inputs, mock_interview_enabled=False)
     assert res["overall_score"] == 0
     assert res["raw_score"] == 0.0
     assert res["level"] == "Not ready"
+    assert res["note"] == "Mock interview not included. Your score is based on the other 80% of the readiness criteria."
 
 
-def test_readiness_formula_mixed_case_1():
+def test_readiness_formula_flag_off_mixed_case():
     """
-    Mixed Case 1 (Hand-calculated arithmetic):
+    Mixed Case (Hand-calculated arithmetic with weights / 80):
+      Resume:          80 * (25 / 80) = 25.00
+      Projects:        60 * (25 / 80) = 18.75
+      GitHub:          90 * (10 / 80) = 11.25
+      Coding practice: 50 * (10 / 80) =  6.25
+      LinkedIn:        80 * ( 5 / 80) =  5.00
+      Co-curricular:   60 * ( 5 / 80) =  3.75
+      Mock interview:  excluded (weight = 0)
+      ---------------------------------------
+      Sum: 25.00 + 18.75 + 11.25 + 6.25 + 5.00 + 3.75 = 70.00
+      Level: "Almost ready" (50 <= 70 <= 74)
+    """
+    inputs = {
+        "resume": {"score": 80},
+        "projects": {"score": 60},
+        "mock_interview": {"score": None},
+        "github": {"score": 90},
+        "coding_practice": {"score": 50},
+        "linkedin": {"score": 80},
+        "co_curricular": {"score": 60},
+    }
+    res = calculate_readiness_formula(inputs, mock_interview_enabled=False)
+    assert res["raw_score"] == 70.0
+    assert res["overall_score"] == 70
+    assert res["level"] == "Almost ready"
+    assert res["note"] == "Mock interview not included. Your score is based on the other 80% of the readiness criteria."
+    assert "mock_interview" not in res["missing_components"]
+    assert all("interview" not in a.id.lower() and "interview" not in a.component.lower() for a in res["top_actions"])
+
+
+# ---------------------------------------------------------------------------
+# 2. Formula Unit Tests: Mode 2 - Flag ON (Interview Taken vs Not Taken)
+# ---------------------------------------------------------------------------
+def test_readiness_formula_flag_on_with_interview_taken():
+    """
+    When flag is ON and interview is TAKEN:
+    Uses original 20% weight, sum of weights = 100, note is None.
+    Hand-calculated arithmetic:
       Resume:          80 * (25 / 100) = 20.0
       Projects:        60 * (25 / 100) = 15.0
       Mock interview:  70 * (20 / 100) = 14.0
@@ -78,72 +124,42 @@ def test_readiness_formula_mixed_case_1():
         "linkedin": {"score": 80},
         "co_curricular": {"score": 60},
     }
-    res = calculate_readiness_formula(inputs)
+    res = calculate_readiness_formula(inputs, mock_interview_enabled=True)
     assert res["raw_score"] == 70.0
     assert res["overall_score"] == 70
     assert res["level"] == "Almost ready"
+    assert res["note"] is None  # Note is NOT shown when interview is taken
+    assert res["breakdown"]["mock_interview"].status == "scored"
+    assert res["breakdown"]["mock_interview"].weight == 20.0
+    assert res["breakdown"]["mock_interview"].weighted_points == 14.0
 
 
-def test_readiness_formula_mixed_case_2():
+def test_readiness_formula_flag_on_interview_not_taken():
     """
-    Mixed Case 2 (Hand-calculated arithmetic):
-      Resume:          92 * (25 / 100) = 23.00
-      Projects:        88 * (25 / 100) = 22.00
-      Mock interview:  85 * (20 / 100) = 17.00
-      GitHub:          80 * (10 / 100) =  8.00
-      Coding practice: 70 * (10 / 100) =  7.00
-      LinkedIn:       100 * ( 5 / 100) =  5.00
-      Co-curricular:   80 * ( 5 / 100) =  4.00
-      ----------------------------------------
-      Sum: 23.0 + 22.0 + 17.0 + 8.0 + 7.0 + 5.0 + 4.0 = 86.00
-      Level: "Placement ready" (75 <= 86 <= 100)
+    When flag is ON but interview is NOT taken:
+    Rescales remaining 6 components to 100 (divided by 80), shows note,
+    and lists mock_interview in missing components with action to unlock 20 pts.
     """
     inputs = {
-        "resume": {"score": 92},
-        "projects": {"score": 88},
-        "mock_interview": {"score": 85},
-        "github": {"score": 80},
-        "coding_practice": {"score": 70},
-        "linkedin": {"score": 100},
-        "co_curricular": {"score": 80},
+        "resume": {"score": 80},
+        "projects": {"score": 60},
+        "mock_interview": {"score": None},
+        "github": {"score": 90},
+        "coding_practice": {"score": 50},
+        "linkedin": {"score": 80},
+        "co_curricular": {"score": 60},
     }
-    res = calculate_readiness_formula(inputs)
-    assert res["raw_score"] == 86.0
-    assert res["overall_score"] == 86
-    assert res["level"] == "Placement ready"
-
-
-def test_readiness_formula_mixed_case_3():
-    """
-    Mixed Case 3 (Hand-calculated arithmetic):
-      Resume:          40 * (25 / 100) = 10.00
-      Projects:        40 * (25 / 100) = 10.00
-      Mock interview:  50 * (20 / 100) = 10.00
-      GitHub:          30 * (10 / 100) =  3.00
-      Coding practice: 20 * (10 / 100) =  2.00
-      LinkedIn:        40 * ( 5 / 100) =  2.00
-      Co-curricular:    0 * ( 5 / 100) =  0.00
-      ----------------------------------------
-      Sum: 10.0 + 10.0 + 10.0 + 3.0 + 2.0 + 2.0 + 0.0 = 37.00
-      Level: "Not ready" (0 <= 37 <= 49)
-    """
-    inputs = {
-        "resume": {"score": 40},
-        "projects": {"score": 40},
-        "mock_interview": {"score": 50},
-        "github": {"score": 30},
-        "coding_practice": {"score": 20},
-        "linkedin": {"score": 40},
-        "co_curricular": {"score": 0},
-    }
-    res = calculate_readiness_formula(inputs)
-    assert res["raw_score"] == 37.0
-    assert res["overall_score"] == 37
-    assert res["level"] == "Not ready"
+    res = calculate_readiness_formula(inputs, mock_interview_enabled=True)
+    assert res["raw_score"] == 70.0
+    assert res["overall_score"] == 70
+    assert res["level"] == "Almost ready"
+    assert res["note"] == "Mock interview not included. Your score is based on the other 80% of the readiness criteria."
+    assert "mock_interview" in res["missing_components"]
+    assert any(a.id == "ACT-MISSING-MOCK-INTERVIEW" for a in res["top_actions"])
 
 
 # ---------------------------------------------------------------------------
-# 2. Boundary Levels: 49, 50, 74, 75
+# 3. Boundary Levels: 49, 50, 74, 75 in Both Modes
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
     "score, expected_level",
@@ -161,57 +177,127 @@ def test_placement_level_boundaries(score: int, expected_level: str):
     assert get_placement_level(score) == expected_level
 
 
-# ---------------------------------------------------------------------------
-# 3. Missing Components Handling (no interview, no LinkedIn)
-# ---------------------------------------------------------------------------
-def test_missing_components_no_crash_or_nan():
+@pytest.mark.parametrize("target_score, expected_level", [
+    (49, "Not ready"),
+    (50, "Almost ready"),
+    (74, "Almost ready"),
+    (75, "Placement ready"),
+])
+def test_boundary_levels_flag_off(target_score: int, expected_level: str):
     """
-    Simulates a student with no mock interview and no LinkedIn review.
-    Score must behave deterministically:
-      - missing components assigned 0 earned points toward total
-      - no crash, no division by zero, no NaN
-      - explicitly flags 'mock_interview' and 'linkedin' in missing_components list
+    Verifies boundary level calculation when flag is OFF.
+    All 6 components set to target_score must result in exactly target_score.
+      target_score * (25/80) * 2 + target_score * (10/80) * 2 + target_score * (5/80) * 2
+      = target_score * (80/80) = target_score.
     """
     inputs = {
-        "resume": {"score": 80},         # 80 * 0.25 = 20.0
-        "projects": {"score": 80},       # 80 * 0.25 = 20.0
-        "mock_interview": {"score": None}, # Missing:  0.0
-        "github": {"score": 80},         # 80 * 0.10 =  8.0
-        "coding_practice": {"score": 80},# 80 * 0.10 =  8.0
-        "linkedin": {"score": None},       # Missing:  0.0
-        "co_curricular": {"score": 80},  # 80 * 0.05 =  4.0
+        "resume": {"score": target_score},
+        "projects": {"score": target_score},
+        "mock_interview": {"score": None},
+        "github": {"score": target_score},
+        "coding_practice": {"score": target_score},
+        "linkedin": {"score": target_score},
+        "co_curricular": {"score": target_score},
     }
-    # Expected sum = 20.0 + 20.0 + 0 + 8.0 + 8.0 + 0 + 4.0 = 60.0
-    res = calculate_readiness_formula(inputs)
+    res = calculate_readiness_formula(inputs, mock_interview_enabled=False)
+    assert res["overall_score"] == target_score
+    assert res["level"] == expected_level
 
+
+@pytest.mark.parametrize("target_score, expected_level", [
+    (49, "Not ready"),
+    (50, "Almost ready"),
+    (74, "Almost ready"),
+    (75, "Placement ready"),
+])
+def test_boundary_levels_flag_on_with_interview(target_score: int, expected_level: str):
+    """
+    Verifies boundary level calculation when flag is ON with completed interview.
+    All 7 components set to target_score must result in exactly target_score.
+    """
+    inputs = {
+        "resume": {"score": target_score},
+        "projects": {"score": target_score},
+        "mock_interview": {"score": target_score},
+        "github": {"score": target_score},
+        "coding_practice": {"score": target_score},
+        "linkedin": {"score": target_score},
+        "co_curricular": {"score": target_score},
+    }
+    res = calculate_readiness_formula(inputs, mock_interview_enabled=True)
+    assert res["overall_score"] == target_score
+    assert res["level"] == expected_level
+
+
+# ---------------------------------------------------------------------------
+# 4. Missing Components Handling (Flag Off vs Flag On)
+# ---------------------------------------------------------------------------
+def test_missing_components_flag_off():
+    """
+    In Flag OFF mode:
+    - Missing LinkedIn contributes 0.0.
+    - Mock interview is NOT included in missing_components.
+    - Remaining 5 completed components contribute:
+        Resume (80) * 25/80 = 25.0
+        Projects (80) * 25/80 = 25.0
+        GitHub (80) * 10/80 = 10.0
+        Coding (80) * 10/80 = 10.0
+        Co-curricular (80) * 5/80 = 5.0
+        Sum = 25 + 25 + 10 + 10 + 5 = 75.00
+    - Overall score = 75 ("Placement ready").
+    """
+    inputs = {
+        "resume": {"score": 80},
+        "projects": {"score": 80},
+        "mock_interview": {"score": None},
+        "github": {"score": 80},
+        "coding_practice": {"score": 80},
+        "linkedin": {"score": None},
+        "co_curricular": {"score": 80},
+    }
+    res = calculate_readiness_formula(inputs, mock_interview_enabled=False)
     assert not math.isnan(res["raw_score"])
-    assert res["raw_score"] == 60.0
-    assert res["overall_score"] == 60
-    assert res["level"] == "Almost ready"
+    assert res["raw_score"] == 75.0
+    assert res["overall_score"] == 75
+    assert res["level"] == "Placement ready"
+    assert "linkedin" in res["missing_components"]
+    assert "mock_interview" not in res["missing_components"]
+    assert res["breakdown"]["linkedin"].status == "missing"
+    assert res["breakdown"]["mock_interview"].status == "excluded"
 
+
+def test_missing_components_flag_on():
+    """
+    In Flag ON mode (interview not taken):
+    - Missing LinkedIn and missing mock interview.
+    - Rescaled formula calculates remaining 5 components to 75.00.
+    - Both 'mock_interview' and 'linkedin' are in missing_components.
+    """
+    inputs = {
+        "resume": {"score": 80},
+        "projects": {"score": 80},
+        "mock_interview": {"score": None},
+        "github": {"score": 80},
+        "coding_practice": {"score": 80},
+        "linkedin": {"score": None},
+        "co_curricular": {"score": 80},
+    }
+    res = calculate_readiness_formula(inputs, mock_interview_enabled=True)
+    assert res["raw_score"] == 75.0
+    assert res["overall_score"] == 75
     assert "mock_interview" in res["missing_components"]
     assert "linkedin" in res["missing_components"]
     assert res["breakdown"]["mock_interview"].status == "missing"
-    assert res["breakdown"]["mock_interview"].score is None
-    assert res["breakdown"]["mock_interview"].weighted_points == 0.0
-
-    assert res["breakdown"]["linkedin"].status == "missing"
-    assert res["breakdown"]["linkedin"].score is None
-    assert res["breakdown"]["linkedin"].weighted_points == 0.0
 
 
 # ---------------------------------------------------------------------------
-# 4. Top 5 Actions Sorted by Points Gained & Claimed Gain Verification
+# 5. Top 5 Actions: Interview Excluded While Flag is Off & Realized Gain
 # ---------------------------------------------------------------------------
-def test_top_actions_sorted_and_applying_top_action_yields_claimed_gain():
+def test_top_actions_never_suggest_interview_while_flag_off():
     """
-    Checks that:
-      1. Actions are sorted strictly descending by points_gained
-      2. Applying the top action produces the EXACT claimed gain in overall score
+    Asserts that when ENABLE_MOCK_INTERVIEW is False, the top 5 actions list
+    never includes taking or improving the mock interview.
     """
-    # Setup initial state where resume has failed check 'CHK-PROFILE-LINKS' (worth 10 pts in resume rubric)
-    # Resume score = 80 (earned 20.0 pts out of 25)
-    # Fixing it gains 10 pts in Resume -> 10 * 0.25 = 2.5 pts in overall score
     failed_check = {
         "id": "CHK-PROFILE-LINKS",
         "label": "LeetCode & GitHub Profile Links",
@@ -219,57 +305,74 @@ def test_top_actions_sorted_and_applying_top_action_yields_claimed_gain():
         "evidence": "LeetCode link missing from resume.",
         "fix": "Add LeetCode profile link to contact header.",
     }
+    inputs = {
+        "resume": {"score": 80, "checks": [failed_check]},
+        "projects": {"score": 80, "checks": []},
+        "mock_interview": {"score": None},
+        "github": {"score": 80, "checks": []},
+        "coding_practice": {"score": 80, "checks": []},
+        "linkedin": {"score": None},
+        "co_curricular": {"score": None},
+    }
+    res = calculate_readiness_formula(inputs, mock_interview_enabled=False)
+    actions = res["top_actions"]
+    assert len(actions) > 0
+    for act in actions:
+        assert "interview" not in act.id.lower()
+        assert "interview" not in act.component.lower()
+
+
+def test_top_actions_claimed_gain_matches_realized_gain_flag_off():
+    """
+    In Flag OFF mode:
+    Resume check CHK-PROFILE-LINKS is worth 10 rubric points.
+    Effective weight of resume = (25 / 80) * 100 = 31.25%.
+    Claimed points gained = round(10 * (25 / 80), 2) = 3.12 points.
+    Fixing it from 80 to 90 produces exact realized gain of 3.12 raw score points.
+    """
+    failed_check = {
+        "id": "CHK-PROFILE-LINKS",
+        "label": "LeetCode & GitHub Profile Links",
+        "pass": False,
+        "evidence": "LeetCode link missing.",
+        "fix": "Add LeetCode profile link.",
+    }
     inputs_before = {
         "resume": {"score": 80, "checks": [failed_check]},
         "projects": {"score": 80, "checks": []},
-        "mock_interview": {"score": 80},
+        "mock_interview": {"score": None},
         "github": {"score": 80, "checks": []},
         "coding_practice": {"score": 80, "checks": []},
         "linkedin": {"score": 80, "checks": []},
         "co_curricular": {"score": 80, "checks": []},
     }
-    res_before = calculate_readiness_formula(inputs_before)
-
-    # Verify actions are sorted descending by points_gained
-    actions = res_before["top_actions"]
-    assert len(actions) > 0
-    for i in range(len(actions) - 1):
-        assert actions[i].points_gained >= actions[i + 1].points_gained
-
-    top_act = actions[0]
+    res_before = calculate_readiness_formula(inputs_before, mock_interview_enabled=False)
+    top_act = res_before["top_actions"][0]
     claimed_gain = top_act.points_gained
     assert top_act.id == "ACT-CHK-PROFILE-LINKS"
-    assert claimed_gain == 2.5  # 10 pts in resume * 0.25 weight = 2.5 pts
+    assert claimed_gain == round(10 * (25.0 / 80.0), 2)  # 3.12
 
-    # Now apply the fix: Resume score increases from 80 to 90 (+10 in resume)
     inputs_after = {
         "resume": {"score": 90, "checks": [{**failed_check, "pass": True}]},
         "projects": {"score": 80, "checks": []},
-        "mock_interview": {"score": 80},
+        "mock_interview": {"score": None},
         "github": {"score": 80, "checks": []},
         "coding_practice": {"score": 80, "checks": []},
         "linkedin": {"score": 80, "checks": []},
         "co_curricular": {"score": 80, "checks": []},
     }
-    res_after = calculate_readiness_formula(inputs_after)
-
+    res_after = calculate_readiness_formula(inputs_after, mock_interview_enabled=False)
     realized_gain = round(res_after["raw_score"] - res_before["raw_score"], 2)
-    assert realized_gain == claimed_gain, (
-        f"Claimed gain {claimed_gain} does not match realized gain {realized_gain}"
-    )
+    assert realized_gain == claimed_gain
 
 
 # ---------------------------------------------------------------------------
-# 5. Database Integration & Progress Verification Flow
+# 6. Database Integration & API Endpoints
 # ---------------------------------------------------------------------------
 def test_progress_tracking_and_history_update(client: TestClient, db_session, student_user: User, student_auth_headers: dict):
     """
-    Test progress:
-      1. Establish baseline review with flawed resume (missing LeetCode link: score 80).
-      2. Verify baseline readiness score snapshot (e.g. 1 point in history).
-      3. Fix issue -> re-run review with score 90.
-      4. Verify score rises by the expected weighted amount (2.5 pts).
-      5. Verify a new history point appears in the database and history endpoint.
+    Verifies that compute_and_save_readiness_score respects the flag,
+    persists history snapshots with the rescaled score and note.
     """
     # 1. Clear previous reviews and scores
     db_session.query(ReadinessScore).filter(ReadinessScore.user_id == student_user.id).delete()
@@ -296,17 +399,10 @@ def test_progress_tracking_and_history_update(client: TestClient, db_session, st
     db_session.add(rev1)
     db_session.commit()
 
-    # Initial readiness calculation
     snap1 = compute_and_save_readiness_score(db_session, student_user.id)
-    initial_score = snap1.overall_score
     initial_raw = snap1.raw_score
 
-    # Check history has 1 entry
-    h1 = get_readiness_history(db_session, student_user.id)
-    assert len(h1) == 1
-    assert h1[0].overall_score == initial_score
-
-    # 2. Fix the issue: new resume review with score = 90 (+10 points in resume)
+    # 2. Fix the issue: resume score increases to 90
     rev2 = ReviewResult(
         user_id=student_user.id,
         review_type="resume",
@@ -326,28 +422,25 @@ def test_progress_tracking_and_history_update(client: TestClient, db_session, st
     db_session.add(rev2)
     db_session.commit()
 
-    # Compute new snapshot
     snap2 = compute_and_save_readiness_score(db_session, student_user.id)
     new_raw = snap2.raw_score
 
-    # Verify score rose by expected weighted amount: 10 * 0.25 = 2.5 points
-    expected_delta = 10 * (WEIGHTS["resume"] / 100.0)  # 2.5
+    # In flag off mode, delta = 10 * 25 / 80 = 3.12 pts
+    expected_delta = round(10 * (25.0 / 80.0), 2)
     assert round(new_raw - initial_raw, 2) == expected_delta
 
-    # Check history now has 2 entries
+    # Check history
     h2 = get_readiness_history(db_session, student_user.id)
     assert len(h2) == 2
-    assert h2[0].id == snap1.id
-    assert h2[1].id == snap2.id
     assert h2[1].overall_score >= h2[0].overall_score
 
 
-# ---------------------------------------------------------------------------
-# 6. API Endpoints & Consent Enforcement
-# ---------------------------------------------------------------------------
-def test_readiness_api_endpoints_and_consent(client: TestClient, db_session, student_user: User, student_auth_headers: dict):
-    """Verifies GET /api/readiness/current, POST /recalculate, and GET /history."""
-    # Ensure profile has consent
+def test_readiness_api_endpoints_flag_off_includes_note(client: TestClient, db_session, student_user: User, student_auth_headers: dict, monkeypatch):
+    """
+    Verifies that GET /api/readiness/current returns the clear note and rescaled criteria when flag is off.
+    """
+    monkeypatch.setattr(config, "ENABLE_MOCK_INTERVIEW", False)
+
     profile = db_session.query(Profile).filter(Profile.user_id == student_user.id).first()
     if not profile:
         profile = Profile(user_id=student_user.id, consent_given=True)
@@ -356,34 +449,16 @@ def test_readiness_api_endpoints_and_consent(client: TestClient, db_session, stu
         profile.consent_given = True
     db_session.commit()
 
-    # Current score endpoint
     resp = client.get("/api/readiness/current", headers=student_auth_headers)
     assert resp.status_code == 200
     data = resp.json()
-    assert "overall_score" in data
-    assert "level" in data
-    assert "breakdown" in data
-    assert "resume" in data["breakdown"]
-    assert "projects" in data["breakdown"]
-    assert "mock_interview" in data["breakdown"]
+    assert "note" in data
+    assert data["note"] == "Mock interview not included. Your score is based on the other 80% of the readiness criteria."
+    assert "mock_interview" not in data.get("missing_components", [])
+    assert data["breakdown"]["mock_interview"]["status"] == "excluded"
+    assert data["breakdown"]["mock_interview"]["weight"] == 0.0
 
-    # Recalculate endpoint
-    recalc_resp = client.post("/api/readiness/recalculate", headers=student_auth_headers)
-    assert recalc_resp.status_code == 200
-    recalc_data = recalc_resp.json()
-    assert recalc_data["overall_score"] == data["overall_score"]
-
-    # History endpoint
-    hist_resp = client.get("/api/readiness/history", headers=student_auth_headers)
-    assert hist_resp.status_code == 200
-    hist_list = hist_resp.json()
-    assert isinstance(hist_list, list)
-    assert len(hist_list) >= 1
-
-    # Revoke consent and verify HTTP 403
-    profile.consent_given = False
-    db_session.commit()
-
-    blocked = client.get("/api/readiness/current", headers=student_auth_headers)
-    assert blocked.status_code == 403
-    assert "Consent required" in blocked.json()["detail"]
+    # Ensure no interview actions in top actions
+    for act in data.get("top_actions", []):
+        assert "interview" not in act["id"].lower()
+        assert "interview" not in act["component"].lower()

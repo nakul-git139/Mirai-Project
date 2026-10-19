@@ -16,6 +16,7 @@ from app.schemas import (
     GitHubReviewRequest,
     GitHubReviewResponse,
     LiveLinkCheckRequest,
+    BackgroundJobResponse,
 )
 from app.services.github_reviewer import evaluate_github_and_live
 from app.services.live_link_checker import check_live_link, SCREENSHOT_DIR
@@ -202,3 +203,143 @@ def get_screenshot(filename: str):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Screenshot not found.")
 
     return FileResponse(str(file_path), media_type="image/png")
+
+
+@router.post("/github/async", response_model=BackgroundJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def trigger_github_review_async(
+    req: Optional[GitHubReviewRequest] = None,
+    provider: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Asynchronously triggers a placement readiness review of GitHub repository and live deployment as a background job.
+    Enforces student consent, per-student hourly rate limits, and per-provider concurrency slots.
+    """
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile or not profile.consent_given:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Consent is required before reviewing your GitHub and codebase. Please grant consent first in the Profile tab.",
+        )
+
+    username = (req.username.strip() if req and req.username else None) or profile.github_username
+    if not username and profile.github_url:
+        match = re.search(r"github\.com/([a-zA-Z0-9_\-]+)", profile.github_url)
+        if match:
+            username = match.group(1)
+
+    repo_url = req.repo_url.strip() if req and req.repo_url else None
+    live_url = req.live_url.strip() if req and req.live_url else None
+    project_title = req.project_title if req else None
+
+    if (not repo_url or not live_url) and profile.projects:
+        for p in profile.projects:
+            if isinstance(p, dict):
+                if not repo_url and p.get("github_url"):
+                    repo_url = p["github_url"]
+                if not live_url and p.get("live_url"):
+                    live_url = p["live_url"]
+                if not project_title and p.get("title"):
+                    project_title = p["title"]
+
+    payload = {
+        "user_id": current_user.id,
+        "username": username,
+        "repo_url": repo_url,
+        "live_url": live_url,
+        "project_title": project_title,
+    }
+    if provider:
+        payload["provider"] = provider
+
+    from app.services.job_queue import job_queue_service, RateLimitExceededError
+    from app.services.job_dispatchers import run_github_review
+
+    try:
+        job = job_queue_service.create_job(
+            user_id=current_user.id,
+            task_type="github_review",
+            payload=payload,
+            provider=provider,
+            db=db,
+        )
+    except RateLimitExceededError as rle:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"message": rle.message, "retry_after": rle.retry_after},
+            headers={"Retry-After": str(rle.retry_after)},
+        )
+
+    job_queue_service.enqueue_and_dispatch(job.id, run_github_review, job.provider)
+    pos = job_queue_service.calculate_queue_position(job.id, job.provider, db)
+
+    return BackgroundJobResponse(
+        id=job.id,
+        user_id=job.user_id,
+        task_type=job.task_type,
+        provider=job.provider,
+        status=job.status,
+        queue_position=pos,
+        result=job.result,
+        error_message=job.error_message,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+    )
+
+
+@router.post("/live-link/async", response_model=BackgroundJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def trigger_live_link_async(
+    req: LiveLinkCheckRequest,
+    provider: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Asynchronously triggers live deployment verification and summary generation as a background job.
+    """
+    payload = {
+        "user_id": current_user.id,
+        "url": req.url,
+        "project_title": req.project_title,
+        "expected_keywords": req.expected_keywords,
+    }
+    if provider:
+        payload["provider"] = provider
+
+    from app.services.job_queue import job_queue_service, RateLimitExceededError
+    from app.services.job_dispatchers import run_live_link_check
+
+    try:
+        job = job_queue_service.create_job(
+            user_id=current_user.id,
+            task_type="live_link_check",
+            payload=payload,
+            provider=provider,
+            db=db,
+        )
+    except RateLimitExceededError as rle:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"message": rle.message, "retry_after": rle.retry_after},
+            headers={"Retry-After": str(rle.retry_after)},
+        )
+
+    job_queue_service.enqueue_and_dispatch(job.id, run_live_link_check, job.provider)
+    pos = job_queue_service.calculate_queue_position(job.id, job.provider, db)
+
+    return BackgroundJobResponse(
+        id=job.id,
+        user_id=job.user_id,
+        task_type=job.task_type,
+        provider=job.provider,
+        status=job.status,
+        queue_position=pos,
+        result=job.result,
+        error_message=job.error_message,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+    )
+

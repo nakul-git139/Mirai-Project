@@ -1,6 +1,10 @@
 from __future__ import annotations
 import re
+import logging
 from typing import List, Dict, Any, Optional, Set, Tuple
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 COMMON_TECH_SKILLS = [
@@ -165,3 +169,66 @@ def rank_jobs(
     # Sort descending by match_score, then stable title order
     ranked.sort(key=lambda j: (-j["match_score"], j.get("title", "")))
     return ranked
+
+
+def generate_job_match_explanation(
+    job_title: str,
+    job_skills: List[str],
+    candidate_skills: List[str],
+    score: int,
+    adapter: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """
+    Generates structured job match explanation with strengths and action items.
+    Uses LLM if available with small num_predict (120) or deterministic rule fallback.
+    """
+    if adapter is None:
+        try:
+            from app.llm.factory import get_llm_adapter
+            adapter = get_llm_adapter()
+        except Exception:
+            adapter = None
+
+    class JobMatchExplanationSchema(BaseModel):
+        match_summary: str = Field(description="1-sentence summary of candidate fit")
+        key_strengths: List[str] = Field(default_factory=list, description="Overlapping core skills")
+        missing_skills: List[str] = Field(default_factory=list, description="Key gaps to bridge")
+        suggested_action: str = Field(description="Actionable suggestion for application")
+
+    if adapter is not None:
+        try:
+            from app.llm.structured import generate_structured_output
+            prompt = (
+                f"Role: {job_title}\n"
+                f"Required Skills: {', '.join(job_skills[:6])}\n"
+                f"Candidate Skills: {', '.join(candidate_skills[:6])}\n"
+                f"Computed Match Score: {score}/100"
+            )
+            res: JobMatchExplanationSchema = generate_structured_output(
+                adapter=adapter,
+                prompt=f"Explain job match:\n{prompt}",
+                schema=JobMatchExplanationSchema,
+                system_prompt="You are a Placement Career Strategist. Return compact JSON with brief bullet phrases.",
+                max_retries=2,
+                temperature=0.0,
+                feature="job_matching_explanation",
+                num_predict=120,
+            )
+            return {
+                "match_summary": res.match_summary,
+                "key_strengths": res.key_strengths,
+                "missing_skills": res.missing_skills,
+                "suggested_action": res.suggested_action,
+            }
+        except Exception as e:
+            logger.debug(f"LLM job match explanation fallback: {e}")
+
+    # Fallback
+    matched = [s for s in job_skills if s in candidate_skills]
+    missing = [s for s in job_skills if s not in candidate_skills]
+    return {
+        "match_summary": f"Strong alignment for {job_title} with {score}% skill overlap.",
+        "key_strengths": matched[:3],
+        "missing_skills": missing[:3],
+        "suggested_action": f"Highlight {matched[0] if matched else 'core coursework'} in cover letter.",
+    }

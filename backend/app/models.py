@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     JSON,
+    Float,
 )
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -41,6 +42,7 @@ class User(Base):
     readiness_scores = relationship("ReadinessScore", back_populates="user", cascade="all, delete-orphan")
     applications = relationship("Application", back_populates="user", cascade="all, delete-orphan")
     posted_jobs = relationship("Job", back_populates="poster", foreign_keys="Job.posted_by")
+    background_jobs = relationship("BackgroundJob", back_populates="user", cascade="all, delete-orphan")
 
 
 class Profile(Base):
@@ -208,4 +210,37 @@ class Application(Base):
 
     user = relationship("User", back_populates="applications")
     job = relationship("Job", back_populates="applications")
+
+
+class LLMTimingLog(Base):
+    __tablename__ = "llm_timing_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    feature = Column(String(100), nullable=False, index=True)
+    provider = Column(String(50), nullable=False)
+    model = Column(String(100), nullable=False)
+    prompt_tokens = Column(Integer, default=0, nullable=False)
+    output_tokens = Column(Integer, default=0, nullable=False)
+    duration_seconds = Column(Float, nullable=False)
+    status = Column(String(50), default="success", nullable=False)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class BackgroundJob(Base):
+    __tablename__ = "background_jobs"
+
+    id = Column(String(50), primary_key=True, index=True)  # UUID hex or string
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    task_type = Column(String(50), nullable=False, index=True)  # resume_review, linkedin_review, github_review, live_link_check, job_match
+    provider = Column(String(50), nullable=False)  # ollama, openai, claude, gemini, mock
+    status = Column(String(50), default="queued", nullable=False, index=True)  # queued, running, done, failed
+    payload = Column(JSON, default=dict, nullable=False)
+    result = Column(JSON, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="background_jobs")
 

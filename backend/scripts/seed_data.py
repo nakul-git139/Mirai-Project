@@ -412,19 +412,27 @@ def seed_database():
         for sdata in sample_students_data:
             existing_user = db.query(User).filter(User.email == sdata["email"]).first()
             if existing_user:
-                print(f"  [·] Sample student exists: {sdata['email']}")
-                continue
-
-            user = User(
-                email=sdata["email"],
-                hashed_password=hash_password("student123"),
-                role=UserRole.STUDENT,
-                full_name=sdata["name"],
-                is_active=True,
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+                existing_user.hashed_password = hash_password("student123")
+                existing_user.full_name = sdata["name"]
+                user = existing_user
+                # Clean up old sub-records so we can re-populate clean reports
+                db.query(ReadinessScore).filter(ReadinessScore.user_id == user.id).delete()
+                db.query(ReviewResult).filter(ReviewResult.user_id == user.id).delete()
+                db.query(InterviewSession).filter(InterviewSession.user_id == user.id).delete()
+                db.query(Application).filter(Application.user_id == user.id).delete()
+                db.query(Profile).filter(Profile.user_id == user.id).delete()
+                db.commit()
+            else:
+                user = User(
+                    email=sdata["email"],
+                    hashed_password=hash_password("student123"),
+                    role=UserRole.STUDENT,
+                    full_name=sdata["name"],
+                    is_active=True,
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
 
             prof = Profile(
                 user_id=user.id,

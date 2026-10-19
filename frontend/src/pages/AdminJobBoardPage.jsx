@@ -20,13 +20,17 @@ import {
   Clock,
   Pin,
   Lock,
+  Layers,
+  Activity,
 } from 'lucide-react';
 import { api } from '../api';
+import AdminQueueMonitor from '../components/AdminQueueMonitor';
 
 export default function AdminJobBoardPage({ currentUser }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('jobs'); // 'jobs' or 'queue'
 
   // Form State
   const [title, setTitle] = useState('');
@@ -227,8 +231,39 @@ export default function AdminJobBoardPage({ currentUser }) {
           </div>
         </div>
 
-        {/* Post Job Form */}
-        <div className="p-6 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-4 shadow-xl">
+        {/* Admin Section Tabs */}
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+          <button
+            onClick={() => setActiveTab('jobs')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === 'jobs'
+                ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+            }`}
+          >
+            <Briefcase className="w-4 h-4" />
+            <span>Campus Job Board</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('queue')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === 'queue'
+                ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-amber-400" />
+            <span>LLM Queue & System Health</span>
+          </button>
+        </div>
+
+        {activeTab === 'queue' ? (
+          <AdminQueueMonitor />
+        ) : (
+          <>
+            {/* Post Job Form */}
+            <div className="p-6 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-4 shadow-xl">
+
           <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
             <div className="flex items-center space-x-2">
               <Plus className="w-4 h-4 text-purple-400" />
@@ -521,6 +556,8 @@ export default function AdminJobBoardPage({ currentUser }) {
             })}
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* APPLICANTS DRAWER / MODAL */}

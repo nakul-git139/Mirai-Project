@@ -246,3 +246,73 @@ def test_resume_review_consent_enforcement(client: TestClient):
     res = client.post("/api/reviews/resume", headers=headers)
     assert res.status_code == 400
     assert "consent is required" in res.json()["detail"].lower()
+
+
+def test_spelling_checker_library_and_grammar_limitations():
+    """
+    Verification Requirement for Item 2 & 3:
+    Uses pyspellchecker with technical-terms allowlist on a new resume containing:
+    - 4 typos not in earlier fixtures: 'recieve', 'enviroment', 'teh', 'definately'
+    - 1 grammar agreement error: 'I has worked on the project'
+    - Technical terms: FastAPI, PostgreSQL, Redis, Docker, React, TypeScript
+    Asserts:
+    1. All 4 typos are caught and mapped to valid suggestions.
+    2. Technical terms are preserved by allowlist and not flagged.
+    3. 'I has worked on the project' is not caught by word-level spell check because
+       each word ('I', 'has', 'worked', 'on', 'the', 'project') is in the dictionary.
+    """
+    import fitz
+    from app.services.resume_reviewer import evaluate_spelling_and_grammar, review_resume
+
+    doc = fitz.open()
+    page = doc.new_page(width=612, height=792)
+    lines = [
+        "Alex Rivera - Full Stack Software Engineer",
+        "Email: alex.rivera@example.com | Phone: (555) 019-2834 | San Francisco, CA",
+        "LinkedIn: https://linkedin.com/in/alexrivera | GitHub: https://github.com/alexrivera | LeetCode: https://leetcode.com/alexrivera",
+        "",
+        "EDUCATION",
+        "Bachelor of Science in Computer Science, State University, 2024 (GPA 3.8/4.0)",
+        "",
+        "EXPERIENCE",
+        "Software Engineering Intern - Cloud Systems Inc (Jun 2023 - Aug 2023)",
+        "- I has worked on the project to recieve real-time telemetry from teh production enviroment.",
+        "- Deployed containerized microservices reducing p99 latency by 35% across 50,000 daily requests.",
+        "- This was definately high impact for our team operations.",
+        "",
+        "PROJECTS",
+        "Distributed Task Queue (Python, FastAPI, Redis, Docker)",
+        "- Architected an asynchronous task orchestrator processing 10,000 jobs per minute with 99.9% uptime.",
+        "- Repository: https://github.com/alexrivera/taskqueue",
+        "",
+        "SKILLS",
+        "Languages & Tools: Python, FastAPI, PostgreSQL, Redis, Docker, React, TypeScript, Git",
+    ]
+
+    y = 50
+    for line in lines:
+        page.insert_text((50, y), line, fontsize=10)
+        y += 18
+
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    result = review_resume(pdf_bytes, "resume_typos_test.pdf")
+    checks_by_id = {c["id"]: c for c in result["checks"]}
+    spell_check = checks_by_id["CHK-SPELL-GRAMMAR"]
+
+    assert spell_check["pass"] is False
+    evidence = spell_check["evidence"].lower()
+    # Confirm all 4 typos are reported
+    assert "recieve" in evidence
+    assert "enviroment" in evidence
+    assert "teh" in evidence
+    assert "definately" in evidence
+
+    # Confirm tech terms are not flagged
+    for tech in ["fastapi", "postgresql", "redis", "docker", "react", "typescript"]:
+        assert f"'{tech}'" not in evidence
+
+    # Confirm grammar limitation: 'has' was not flagged
+    assert "'has'" not in evidence
+

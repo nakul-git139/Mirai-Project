@@ -30,8 +30,12 @@ export default function Sidebar({
   currentUser,
   onLogout,
   onOpenAuth,
+  enableMockInterview = false,
 }) {
   const isAdmin = currentUser?.role === 'admin';
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => item.id !== 'interview' || enableMockInterview
+  );
 
   return (
     <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col justify-between shrink-0 select-none">
@@ -49,7 +53,7 @@ export default function Sidebar({
 
         {/* Navigation list */}
         <nav className="p-3 space-y-1">
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (

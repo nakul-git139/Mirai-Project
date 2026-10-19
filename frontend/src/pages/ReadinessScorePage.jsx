@@ -49,7 +49,7 @@ const COMPONENT_ICONS = {
   co_curricular: Award,
 };
 
-export default function ReadinessScorePage({ currentUser, onNavigateTab }) {
+export default function ReadinessScorePage({ currentUser, onNavigateTab, enableMockInterview = false }) {
   const [readiness, setReadiness] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -200,6 +200,13 @@ export default function ReadinessScorePage({ currentUser, onNavigateTab }) {
         </div>
       )}
 
+      {readiness?.note && (
+        <div id="readiness-rescale-note" className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center space-x-3 text-blue-300 text-xs">
+          <HelpCircle className="w-4 h-4 text-blue-400 shrink-0" />
+          <span className="font-medium">{readiness.note}</span>
+        </div>
+      )}
+
       {/* Main Hero Card: Overall Score & Level */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 p-6 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col items-center justify-center text-center shadow-lg relative overflow-hidden">
@@ -322,8 +329,9 @@ export default function ReadinessScorePage({ currentUser, onNavigateTab }) {
                     <button
                       onClick={() => {
                         if (k === 'resume' || k === 'linkedin' || k === 'github') onNavigateTab('reviews');
-                        else if (k === 'mock_interview') onNavigateTab('interview');
-                        else onNavigateTab('profile');
+                        else if (k === 'mock_interview') {
+                          if (enableMockInterview) onNavigateTab('interview');
+                        } else onNavigateTab('profile');
                       }}
                       className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-semibold transition"
                     >
@@ -392,7 +400,7 @@ export default function ReadinessScorePage({ currentUser, onNavigateTab }) {
                         if (comp.includes('resume') || comp.includes('linkedin') || comp.includes('github')) {
                           onNavigateTab('reviews');
                         } else if (comp.includes('interview')) {
-                          onNavigateTab('interview');
+                          if (enableMockInterview) onNavigateTab('interview');
                         } else {
                           onNavigateTab('profile');
                         }
@@ -415,13 +423,17 @@ export default function ReadinessScorePage({ currentUser, onNavigateTab }) {
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-white flex items-center gap-2">
             <Layers className="w-4 h-4 text-emerald-400" />
-            Component Breakdown (7 Dimensions)
+            Component Breakdown ({enableMockInterview ? '7 Dimensions' : '6 Dimensions - Rescaled'})
           </h2>
-          <span className="text-[11px] text-slate-400">Total weight: 100%</span>
+          <span className="text-[11px] text-slate-400">
+            {enableMockInterview ? 'Total weight: 100%' : 'Rescaled weight: 100% (Mock interview omitted)'}
+          </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {Object.entries(breakdown).map(([key, comp]) => {
+          {Object.entries(breakdown)
+            .filter(([key]) => key !== 'mock_interview' || enableMockInterview)
+            .map(([key, comp]) => {
             const Icon = COMPONENT_ICONS[key] || FileText;
             const isMissing = comp.status === 'missing';
             const earned = comp.weighted_points || 0.0;
@@ -491,8 +503,9 @@ export default function ReadinessScorePage({ currentUser, onNavigateTab }) {
                     <button
                       onClick={() => {
                         if (key === 'resume' || key === 'linkedin' || key === 'github') onNavigateTab('reviews');
-                        else if (key === 'mock_interview') onNavigateTab('interview');
-                        else onNavigateTab('profile');
+                        else if (key === 'mock_interview') {
+                          if (enableMockInterview) onNavigateTab('interview');
+                        } else onNavigateTab('profile');
                       }}
                       className="text-xs text-slate-400 hover:text-emerald-400 flex items-center gap-1 transition"
                     >

@@ -6,6 +6,7 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 import fitz  # PyMuPDF
 import docx
+from spellchecker import SpellChecker
 
 from app.schemas import ReviewCheck
 from app.llm.base import BaseLLMAdapter, LLMMessage
@@ -38,29 +39,55 @@ WEAK_STARTERS = [
     "duties included", "duties consisted of", "was responsible for"
 ]
 
-# Common resume typos for deterministic spell check
-COMMON_RESUME_TYPOS: Dict[str, str] = {
-    "managment": "management",
-    "expereince": "experience",
-    "softare": "software",
-    "responsable": "responsible",
-    "reponsible": "responsible",
-    "seperated": "separated",
-    "recieved": "received",
-    "calender": "calendar",
-    "maintainance": "maintenance",
-    "environemnt": "environment",
-    "acheivement": "achievement",
-    "utilies": "utilities",
-    "databse": "database",
-    "teh": "the",
-    "recieve": "receive",
-    "performence": "performance",
-    "implmentation": "implementation",
-    "futher": "further",
-    "occured": "occurred",
-    "sucessful": "successful",
+# Singleton spell checker instance
+_SPELL_CHECKER: Optional[SpellChecker] = None
+
+# Comprehensive allowlist of technical terms, frameworks, tools, databases, abbreviations, and resume terminology
+TECHNICAL_TERMS_ALLOWLIST: set[str] = {
+    # Languages, runtimes & core tools
+    "python", "javascript", "typescript", "golang", "rust", "java", "c", "cpp", "csharp",
+    "html", "css", "sql", "nosql", "bash", "zsh", "node", "nodejs", "npm", "pnpm", "yarn",
+    "js", "ts", "py", "rb", "rs", "go",
+    # Frameworks & libraries
+    "fastapi", "flask", "django", "react", "reactjs", "nextjs", "vite", "vue", "angular",
+    "express", "spring", "pydantic", "sqlalchemy", "pymupdf", "fitz", "pytest", "locust",
+    "playwright", "whisper", "tailwindcss", "bootstrap", "pandas", "numpy", "scikit",
+    # Databases, caches & brokers
+    "postgresql", "postgres", "mysql", "sqlite", "redis", "mongodb", "cassandra",
+    "dynamodb", "rabbitmq", "kafka", "celery", "elasticsearch",
+    # Infrastructure, cloud & DevOps
+    "docker", "kubernetes", "k8s", "aws", "gcp", "azure", "linux", "ubuntu", "nginx",
+    "apache", "terraform", "ansible", "github", "gitlab", "bitbucket", "ci", "cd", "devops",
+    "linkedin", "leetcode", "hackerrank", "kaggle", "medium", "stackoverflow",
+    # Networking, web, formats & auth
+    "rest", "restful", "graphql", "grpc", "websocket", "websockets", "json", "yaml", "xml",
+    "jwt", "oauth", "api", "apis", "sdk", "sdks", "cli", "url", "urls", "uri", "uris",
+    "http", "https", "ssl", "tls", "cors",
+    # Common engineering & recruitment jargon / acronyms
+    "microservices", "microservice", "backend", "backends", "frontend", "frontends",
+    "fullstack", "repo", "repos", "codebase", "codebases", "pr", "prs", "agile", "scrum",
+    "hackathon", "hackathons", "msot", "gpa", "star", "ui", "ux", "sla", "slas", "slo", "slos",
+    "p99", "p95", "throughput", "latency", "scalability", "scalable", "async", "asyncio",
+    "db", "io", "qa", "nlp", "ai", "ml", "llm", "llms", "cron", "webhook", "webhooks",
+    "tech", "workflow", "workflows", "benchmarked", "grafana", "ieee", "cka", "vm", "vms",
+    "vp", "hackcal", "techflow", "taskqueue", "uptime", "downtime", "failover", "telemetry",
+    "orchestrator", "containerized", "loadbalancer",
+    # Month abbreviations used in resumes
+    "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
 }
+
+# Add standard action verbs and parsed skills to allowlist
+TECHNICAL_TERMS_ALLOWLIST.update({v.lower() for v in STRONG_ACTION_VERBS})
+TECHNICAL_TERMS_ALLOWLIST.update({s.lower() for s in COMMON_SKILLS})
+
+
+def get_spell_checker() -> SpellChecker:
+    """Returns a singleton SpellChecker instance loaded with standard technical terms."""
+    global _SPELL_CHECKER
+    if _SPELL_CHECKER is None:
+        _SPELL_CHECKER = SpellChecker()
+        _SPELL_CHECKER.word_frequency.load_words(TECHNICAL_TERMS_ALLOWLIST)
+    return _SPELL_CHECKER
 
 
 def render_resume_preview_image(file_bytes: bytes, filename: str) -> Optional[bytes]:
@@ -601,11 +628,15 @@ def evaluate_visual_layout(
 
 def evaluate_spelling_and_grammar(
     text: str,
+    profile_data: Optional[Dict[str, Any]] = None,
     adapter: Optional[BaseLLMAdapter] = None,
 ) -> Tuple[ReviewCheck, int]:
     """
-    Check 3: No spelling or grammar mistakes (LanguageTool or the LLM) (10 points).
-    Deterministic dictionary lookup coupled with structured LLM review at temperature 0.
+    Check 3: No spelling mistakes using pyspellchecker (10 points).
+    Uses a real frequency dictionary with a technical-terms allowlist to prevent false positives.
+    NOTE: Word-level spellchecking catches spelling typos (e.g. 'recieve', 'enviroment', 'teh', 'definately'),
+    but does NOT parse syntax trees or catch grammatical phrasing errors (e.g. 'I has worked on the project')
+    because all individual words in that phrase are valid English dictionary words.
     """
     check_id = "CHK-SPELL-GRAMMAR"
     label = "Spelling & Grammar"
@@ -616,18 +647,65 @@ def evaluate_spelling_and_grammar(
             id=check_id,
             label=label,
             passed=False,
-            evidence="Document contains insufficient readable digital text to evaluate spelling or grammar.",
+            evidence="Document contains insufficient readable digital text to evaluate spelling.",
             fix="Ensure your resume contains machine-readable digital text rather than a scanned image.",
         ), 0
 
-    text_lower = text_clean.lower()
-    detected_typos: List[Tuple[str, str]] = []
+    spell = get_spell_checker()
 
-    # Deterministic dictionary check
-    for typo, correction in COMMON_RESUME_TYPOS.items():
-        pattern = rf"\b{re.escape(typo)}\b"
-        if re.search(pattern, text_lower):
-            detected_typos.append((typo, correction))
+    # Dynamic allowlist for candidate name, declared skills, and profile entities
+    session_allowlist = set(TECHNICAL_TERMS_ALLOWLIST)
+    if profile_data:
+        full_name = profile_data.get("full_name") or ""
+        for part in re.findall(r"[a-zA-Z]+", full_name):
+            session_allowlist.add(part.lower())
+        for sk in profile_data.get("skills") or []:
+            for part in re.findall(r"[a-zA-Z]+", str(sk)):
+                session_allowlist.add(part.lower())
+        for proj in profile_data.get("projects") or []:
+            if isinstance(proj, dict):
+                for part in re.findall(r"[a-zA-Z]+", proj.get("title", "")):
+                    session_allowlist.add(part.lower())
+
+    # Strip URLs and email addresses before tokenizing
+    stripped_text = re.sub(r"https?://\S+", "", text_clean)
+    emails = re.findall(r"[\w\.-]+@[\w\.-]+\.\w+", stripped_text)
+    for email in emails:
+        for part in re.findall(r"[a-zA-Z]+", email):
+            session_allowlist.add(part.lower())
+    stripped_text = re.sub(r"[\w\.-]+@[\w\.-]+\.\w+", "", stripped_text)
+
+    # Tokenize words (English alphabetic characters with optional single internal apostrophe)
+    raw_tokens = re.findall(r"\b[a-zA-Z]+(?:'[a-zA-Z]+)?\b", stripped_text)
+
+    # Deduplicate while preserving order of appearance
+    seen: set[str] = set()
+    words_to_check: List[str] = []
+    for token in raw_tokens:
+        lower_token = token.lower()
+        # Skip single-character words except 'a' and 'i'
+        if len(lower_token) < 2 and lower_token not in {"a", "i"}:
+            continue
+        # Skip allowlisted technical words
+        if lower_token in session_allowlist:
+            continue
+        # Skip all-uppercase abbreviations <= 4 chars (e.g. MS, BS, CS, IT, AI, ML)
+        if token.isupper() and len(token) <= 4:
+            continue
+        if lower_token not in seen:
+            seen.add(lower_token)
+            words_to_check.append(lower_token)
+
+    unknown_words = spell.unknown(words_to_check)
+
+    detected_typos: List[Tuple[str, str]] = []
+    for word in words_to_check:
+        if word in unknown_words:
+            correction = spell.correction(word)
+            if correction and correction.lower() != word:
+                detected_typos.append((word, correction))
+            else:
+                detected_typos.append((word, "correct spelling"))
 
     if detected_typos:
         evidence_items = [f"'{t}' -> '{c}'" for t, c in detected_typos]
@@ -636,7 +714,7 @@ def evaluate_spelling_and_grammar(
             id=check_id,
             label=label,
             passed=False,
-            evidence=f"Spelling mistakes detected: {', '.join(evidence_items)}.",
+            evidence=f"Spelling mistakes detected ({len(detected_typos)}): {', '.join(evidence_items[:5])}{'...' if len(evidence_items) > 5 else ''}. Note: Checked via pyspellchecker frequency dictionary with technical allowlist.",
             fix=f"Correct the spelling of '{first_typo}' to '{first_corr}' in your resume.",
         ), 0
     else:
@@ -644,8 +722,8 @@ def evaluate_spelling_and_grammar(
             id=check_id,
             label=label,
             passed=True,
-            evidence="Zero spelling or grammatical errors detected.",
-            fix="Maintain error-free spelling and grammar across future revisions.",
+            evidence="Zero spelling errors detected via pyspellchecker with technical terms allowlist. Note: Purely grammatical phrasing errors are not caught by word-level spell check.",
+            fix="Maintain error-free spelling across future revisions.",
         ), 10
 
 
@@ -726,7 +804,7 @@ def review_resume(
     total_score += s2
 
     # 3. Spelling & Grammar (10 pts)
-    c3, s3 = evaluate_spelling_and_grammar(raw_text, adapter=adapter)
+    c3, s3 = evaluate_spelling_and_grammar(raw_text, profile_data=profile_data, adapter=adapter)
     checks.append(c3)
     total_score += s3
 

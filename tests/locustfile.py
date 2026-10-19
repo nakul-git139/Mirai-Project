@@ -25,15 +25,34 @@ if BACKEND_DIR not in sys.path:
 from locust import HttpUser, task, between
 from app.auth import create_access_token
 
-# Pre-generate valid JWT tokens for seeded student users directly (zero DB dependency)
-PRE_GENERATED_TOKENS = [
-    create_access_token({"sub": "11", "role": "student", "email": "student@msot.edu"}),
-    create_access_token({"sub": "82", "role": "student", "email": "ananya.sharma@msot.edu"}),
-    create_access_token({"sub": "83", "role": "student", "email": "rohan.patel@msot.edu"}),
-    create_access_token({"sub": "84", "role": "student", "email": "priya.nair@msot.edu"}),
-    create_access_token({"sub": "85", "role": "student", "email": "vikram.verma@msot.edu"}),
-    create_access_token({"sub": "86", "role": "student", "email": "sneha.reddy@msot.edu"}),
-]
+def get_seeded_student_tokens():
+    try:
+        from app.database import SessionLocal
+        from app.models import User
+        db = SessionLocal()
+        tokens = []
+        for email in [
+            "student@msot.edu",
+            "ananya.sharma@msot.edu",
+            "rohan.patel@msot.edu",
+            "priya.nair@msot.edu",
+            "vikram.verma@msot.edu",
+            "sneha.reddy@msot.edu",
+        ]:
+            u = db.query(User).filter_by(email=email).first()
+            if u:
+                tokens.append(create_access_token({"sub": str(u.id), "role": u.role, "email": u.email}))
+        db.close()
+        if tokens:
+            return tokens
+    except Exception:
+        pass
+    return [
+        create_access_token({"sub": "11", "role": "student", "email": "student@msot.edu"}),
+        create_access_token({"sub": "82", "role": "student", "email": "ananya.sharma@msot.edu"}),
+    ]
+
+PRE_GENERATED_TOKENS = get_seeded_student_tokens()
 
 
 class StudentUser(HttpUser):

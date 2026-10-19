@@ -6,6 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 
+from app import config
 from app.database import get_db
 from app.models import User, Profile, InterviewSession
 from app.auth import get_current_user
@@ -27,7 +28,21 @@ from app.services.voice_service import transcribe_audio_bytes
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/interview", tags=["Mock Interview"])
+
+def check_mock_interview_enabled():
+    """Validates that mock interview feature flag is enabled before serving any interview route."""
+    if not getattr(config, "ENABLE_MOCK_INTERVIEW", False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mock interview feature is not enabled.",
+        )
+
+
+router = APIRouter(
+    prefix="/api/interview",
+    tags=["Mock Interview"],
+    dependencies=[Depends(check_mock_interview_enabled)],
+)
 
 
 def _to_session_response(session: InterviewSession, transcription: Optional[str] = None) -> InterviewSessionResponse:

@@ -340,6 +340,71 @@ export const api = {
     const qs = days !== null ? `?days=${days}` : "";
     return fetchApi(`/api/tracker/reminders${qs}`);
   },
+
+  // Background LLM Jobs & Queue
+  triggerBackgroundJob: (taskType, payload = {}, provider = null) =>
+    fetchApi("/api/jobs/trigger", {
+      method: "POST",
+      body: JSON.stringify({ task_type: taskType, payload, provider }),
+    }),
+  getJobStatus: (jobId) => fetchApi(`/api/jobs/status/${jobId}`),
+  getMyActiveJobs: () => fetchApi("/api/jobs/my/active"),
+  getAdminQueueStatus: () => fetchApi("/api/admin/llm-queue"),
+
+  triggerResumeReviewAsync: (file = null, provider = null) => {
+    if (file) {
+      const formData = new FormData();
+      formData.append("file", file);
+      const url = provider ? `/api/reviews/resume/async?provider=${provider}` : "/api/reviews/resume/async";
+      return fetchApi(url, {
+        method: "POST",
+        body: formData,
+      });
+    }
+    const url = provider ? `/api/reviews/resume/async?provider=${provider}` : "/api/reviews/resume/async";
+    return fetchApi(url, { method: "POST" });
+  },
+
+  triggerLinkedInReviewAsync: (file = null, text = null, provider = null) => {
+    if (file) {
+      const formData = new FormData();
+      formData.append("file", file);
+      const url = provider ? `/api/reviews/linkedin/async?provider=${provider}` : "/api/reviews/linkedin/async";
+      return fetchApi(url, {
+        method: "POST",
+        body: formData,
+      });
+    }
+    const query = new URLSearchParams();
+    if (text) query.append("text", text);
+    if (provider) query.append("provider", provider);
+    const qs = query.toString();
+    return fetchApi(`/api/reviews/linkedin/async${qs ? `?${qs}` : ""}`, { method: "POST" });
+  },
+
+  triggerGitHubReviewAsync: (data = {}, provider = null) => {
+    const url = provider ? `/api/reviews/github/async?provider=${provider}` : "/api/reviews/github/async";
+    return fetchApi(url, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  triggerLiveLinkAsync: (data, provider = null) => {
+    const url = provider ? `/api/reviews/live-link/async?provider=${provider}` : "/api/reviews/live-link/async";
+    return fetchApi(url, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  triggerJobMatchAsync: (payload, provider = null) => {
+    const url = provider ? `/api/jobs/match/async?provider=${provider}` : "/api/jobs/match/async";
+    return fetchApi(url, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
 };
 
 

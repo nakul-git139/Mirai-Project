@@ -20,6 +20,8 @@ import {
   Check,
 } from 'lucide-react';
 import { api } from '../api';
+import OllamaProgressIndicator from '../components/OllamaProgressIndicator';
+import JobProgressIndicator from '../components/JobProgressIndicator';
 
 function GitHubIcon({ className = "w-4 h-4" }) {
   return (
@@ -37,6 +39,7 @@ export default function GitHubReviewTab({ currentUser, onNavigateToProfile }) {
   const [review, setReview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [runningReview, setRunningReview] = useState(false);
+  const [activeJobId, setActiveJobId] = useState(() => localStorage.getItem('active_job_github_review') || null);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all'); // all, failed, passed
   const [screenshotMode, setScreenshotMode] = useState('desktop'); // desktop, mobile
@@ -48,6 +51,11 @@ export default function GitHubReviewTab({ currentUser, onNavigateToProfile }) {
 
   useEffect(() => {
     loadLatestReview();
+    const savedJob = localStorage.getItem('active_job_github_review');
+    if (savedJob) {
+      setActiveJobId(savedJob);
+      setRunningReview(true);
+    }
   }, [currentUser]);
 
   const loadLatestReview = async () => {
@@ -94,11 +102,16 @@ export default function GitHubReviewTab({ currentUser, onNavigateToProfile }) {
       if (repoUrl.trim()) payload.repo_url = repoUrl.trim();
       if (liveUrl.trim()) payload.live_url = liveUrl.trim();
 
-      const result = await api.triggerGitHubReview(payload);
-      setReview(result);
+      const res = await api.triggerGitHubReviewAsync(payload);
+      setActiveJobId(res.id);
+      localStorage.setItem('active_job_github_review', res.id);
     } catch (err) {
-      setError(err.message || 'Failed to complete review.');
-    } finally {
+      if (err.status === 429) {
+        const retry = err.data?.detail?.retry_after || err.data?.retry_after || 60;
+        setError(`Rate limit reached: Maximum reviews per hour exceeded. Please retry after ${retry} seconds.`);
+      } else {
+        setError(err.message || 'Failed to complete review.');
+      }
       setRunningReview(false);
     }
   };
@@ -248,6 +261,28 @@ export default function GitHubReviewTab({ currentUser, onNavigateToProfile }) {
         </div>
       )}
 
+      {/* Running Review Background Job Progress Indicator */}
+      {runningReview && activeJobId ? (
+        <JobProgressIndicator
+          jobId={activeJobId}
+          taskType="github_review"
+          featureTitle="GitHub & Codebase Benchmark Review"
+          onComplete={(res) => {
+            setReview(res);
+            setActiveJobId(null);
+            setRunningReview(false);
+          }}
+          onError={(err) => {
+            setError(err);
+            setActiveJobId(null);
+            setRunningReview(false);
+          }}
+        />
+      ) : runningReview && (
+        <OllamaProgressIndicator featureName="GitHub & Codebase Benchmark Review" />
+      )}
+
+
       {/* Loading Spinner */}
       {loading && (
         <div className="p-16 text-center space-y-3">
@@ -369,11 +404,10 @@ export default function GitHubReviewTab({ currentUser, onNavigateToProfile }) {
                   <div>
                     <h3 className="text-sm font-bold text-white flex items-center gap-2">
                       Playwright Live Deployment Verification
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                        review.live_link_results.loaded
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${review.live_link_results.loaded
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                           : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                      }`}>
+                        }`}>
                         {review.live_link_results.loaded ? `HTTP ${review.live_link_results.status_code || 200} OK` : 'Connection Failed'}
                       </span>
                     </h3>
@@ -387,22 +421,20 @@ export default function GitHubReviewTab({ currentUser, onNavigateToProfile }) {
                 <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 self-start sm:self-auto">
                   <button
                     onClick={() => setScreenshotMode('desktop')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
-                      screenshotMode === 'desktop'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${screenshotMode === 'desktop'
                         ? 'bg-cyan-600 text-white shadow'
                         : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     <Monitor className="w-3.5 h-3.5" />
                     <span>Desktop (1280x720)</span>
                   </button>
                   <button
                     onClick={() => setScreenshotMode('mobile')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
-                      screenshotMode === 'mobile'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${screenshotMode === 'mobile'
                         ? 'bg-cyan-600 text-white shadow'
                         : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     <Smartphone className="w-3.5 h-3.5" />
                     <span>Mobile (375x667)</span>
@@ -420,9 +452,8 @@ export default function GitHubReviewTab({ currentUser, onNavigateToProfile }) {
                 </div>
                 <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
                   <span className="text-xs text-slate-400 font-medium">Console Health</span>
-                  <span className={`text-xs font-bold font-mono ${
-                    review.live_link_results.console_errors?.length === 0 ? 'text-emerald-400' : 'text-rose-400'
-                  }`}>
+                  <span className={`text-xs font-bold font-mono ${review.live_link_results.console_errors?.length === 0 ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
                     {review.live_link_results.console_errors?.length === 0
                       ? '0 Console Errors'
                       : `${review.live_link_results.console_errors?.length} Error(s)`}
@@ -468,26 +499,23 @@ export default function GitHubReviewTab({ currentUser, onNavigateToProfile }) {
             <div className="flex items-center space-x-2 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800 w-fit">
               <button
                 onClick={() => setFilter('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-                  filter === 'all' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${filter === 'all' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 All Checks ({checks.length})
               </button>
               <button
                 onClick={() => setFilter('failed')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
-                  filter === 'failed' ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-amber-400'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${filter === 'failed' ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-amber-400'
+                  }`}
               >
                 <AlertTriangle className="w-3.5 h-3.5" />
                 Needs Fix ({failedCount})
               </button>
               <button
                 onClick={() => setFilter('passed')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
-                  filter === 'passed' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-emerald-400'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${filter === 'passed' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-emerald-400'
+                  }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Passed ({passedCount})
@@ -500,18 +528,16 @@ export default function GitHubReviewTab({ currentUser, onNavigateToProfile }) {
             {filteredChecks.map((chk) => (
               <div
                 key={chk.id}
-                className={`p-5 rounded-2xl border transition-all ${
-                  chk.pass
+                className={`p-5 rounded-2xl border transition-all ${chk.pass
                     ? 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700'
                     : 'bg-slate-950/70 border-amber-500/20 hover:border-amber-500/40'
-                }`}
+                  }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start space-x-3.5">
                     <div
-                      className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                        chk.pass ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
-                      }`}
+                      className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${chk.pass ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                        }`}
                     >
                       {chk.pass ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                     </div>
@@ -529,11 +555,10 @@ export default function GitHubReviewTab({ currentUser, onNavigateToProfile }) {
                   </div>
 
                   <span
-                    className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border flex-shrink-0 ${
-                      chk.pass
+                    className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border flex-shrink-0 ${chk.pass
                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                         : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    }`}
+                      }`}
                   >
                     {chk.pass ? 'PASS' : 'FIX NEEDED'}
                   </span>

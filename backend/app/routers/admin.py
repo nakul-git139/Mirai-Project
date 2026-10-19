@@ -20,6 +20,7 @@ from app.schemas import (
     UserResponse,
     ApplicantItem,
     ApplicantStatusUpdate,
+    AdminQueueStatusResponse,
 )
 from app.auth import require_admin
 
@@ -258,3 +259,14 @@ def list_students(
     """Admin-only endpoint to inspect student accounts."""
     students = db.query(User).filter(User.role == UserRole.STUDENT).all()
     return students
+
+
+@router.get("/llm-queue", response_model=AdminQueueStatusResponse)
+def get_admin_llm_queue(
+    current_admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Admin-only endpoint for queue length, running jobs, limits, and timings."""
+    from app.services.job_queue import job_queue_service
+    data = job_queue_service.get_admin_queue_status(db)
+    return AdminQueueStatusResponse(**data)

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, Profile, UploadedFile, ReviewResult
 from app.auth import get_current_user
-from app.schemas import LinkedInReviewResponse, LinkedInReviewTextRequest
+from app.schemas import LinkedInReviewResponse, LinkedInReviewTextRequest, BackgroundJobResponse
 from app.services.linkedin_reviewer import review_linkedin
 from app.services.profile_parser import parse_resume_file
 
@@ -302,3 +302,70 @@ def get_latest_linkedin_review(
         rewrites=latest_review.rewrites or {},
         created_at=latest_review.created_at,
     )
+
+
+@router.post("/async", response_model=BackgroundJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def trigger_linkedin_review_async(
+    file: Optional[UploadFile] = File(None),
+    text: Optional[str] = None,
+    provider: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Asynchronously triggers a placement readiness review of the student's LinkedIn profile as a background job.
+    Enforces student consent, per-student hourly rate limits, and per-provider concurrency slots.
+    """
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile or not profile.consent_given:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Consent is required before reviewing your LinkedIn profile. Please grant consent first in the Profile tab.",
+        )
+
+    payload: Dict[str, Any] = {"user_id": current_user.id}
+    if file is not None:
+        content = await file.read()
+        import base64
+        payload["file_b64"] = base64.b64encode(content).decode("ascii")
+        payload["filename"] = file.filename or "linkedin_profile.pdf"
+    elif text:
+        payload["text"] = text
+    if provider:
+        payload["provider"] = provider
+
+    from app.services.job_queue import job_queue_service, RateLimitExceededError
+    from app.services.job_dispatchers import run_linkedin_review
+
+    try:
+        job = job_queue_service.create_job(
+            user_id=current_user.id,
+            task_type="linkedin_review",
+            payload=payload,
+            provider=provider,
+            db=db,
+        )
+    except RateLimitExceededError as rle:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"message": rle.message, "retry_after": rle.retry_after},
+            headers={"Retry-After": str(rle.retry_after)},
+        )
+
+    job_queue_service.enqueue_and_dispatch(job.id, run_linkedin_review, job.provider)
+    pos = job_queue_service.calculate_queue_position(job.id, job.provider, db)
+
+    return BackgroundJobResponse(
+        id=job.id,
+        user_id=job.user_id,
+        task_type=job.task_type,
+        provider=job.provider,
+        status=job.status,
+        queue_position=pos,
+        result=job.result,
+        error_message=job.error_message,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+    )
+
