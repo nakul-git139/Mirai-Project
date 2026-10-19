@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-19  
 **Tester**: Antigravity Pair Programmer  
-**Environment**: macOS (Darwin 25.0.0), Python 3.11.17, SQLite (WAL mode), Remote Ollama at `http://10.134.74.60:11434` (models: `qwen2.5:3b`, `qwen2.5:7b`), React (Vite).
+**Environment**: macOS (Darwin 25.0.0), Python 3.11.17, SQLite (WAL mode), Remote Ollama at `http://<OLLAMA_HOST>:11434` (models: `qwen2.5:3b`, `qwen2.5:7b`), React (Vite).
 
 ---
 
@@ -92,7 +92,7 @@ asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, a
 collecting ... collected 1 item                                                               
 
 backend/tests/test_concurrency_and_queue.py::test_live_remote_ollama_five_concurrent_reviews 
-[VERIFICATION 3] Live Remote Ollama 5-Job Execution Report (Host: http://10.134.74.60:11434):
+[VERIFICATION 3] Live Remote Ollama 5-Job Execution Report (Host: http://<OLLAMA_HOST>:11434):
 Total Wall Clock Duration: 17.12s
   - Job #1 (db8ca8108441475e): status=done, duration=6.93s, score=100
   - Job #2 (779aa93d61de4333): status=done, duration=2.23s, score=100
@@ -117,7 +117,7 @@ make test-live
 ```
 **Real Terminal Output**:
 ```
-Running live remote Ollama tests with pytest against http://10.134.74.60:11434...
+Running live remote Ollama tests with pytest against http://<OLLAMA_HOST>:11434...
 backend/venv/bin/pytest -m live -v -o addopts=""
 ============================= test session starts ==============================
 platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3.11

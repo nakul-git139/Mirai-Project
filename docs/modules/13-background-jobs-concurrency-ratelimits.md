@@ -39,7 +39,7 @@ sequenceDiagram
     participant Queue as services/job_queue.py
     participant DB as SQLite (career_copilot.db)
     participant Worker as ThreadPool Worker
-    participant LLM as Remote Ollama (http://10.134.74.60:11434)
+    participant LLM as Remote Ollama (http://<OLLAMA_HOST>:11434)
 
     Student->>UI: Submits Resume Review
     UI->>Router: POST /api/jobs/trigger (or /api/resume/async)
@@ -116,7 +116,7 @@ sequenceDiagram
 - **None**:
   - Concurrency limits use real `threading.Semaphore`.
   - Rate limiting uses real sliding-window queries against the SQLite database.
-  - Live remote Ollama tests execute real HTTP calls to `http://10.134.74.60:11434` with model `qwen2.5:3b`.
+  - Live remote Ollama tests execute real HTTP calls to `http://<OLLAMA_HOST>:11434` with model `qwen2.5:3b`.
   - Admin access strictly enforces JWT `role == "admin"`.
   - Tenant isolation strictly forbids students from inspecting other students' jobs.
 
@@ -147,9 +147,9 @@ backend/venv/bin/pytest backend/tests/test_concurrency_and_queue.py -v -m "not l
 backend/venv/bin/pytest backend/tests/test_concurrency_and_queue.py::test_live_remote_ollama_five_concurrent_reviews -v -s -o addopts=""
 ```
 *Expected Result*:
-All 5 jobs queue and complete sequentially against `http://10.134.74.60:11434` with `qwen2.5:3b`:
+All 5 jobs queue and complete sequentially against `http://<OLLAMA_HOST>:11434` with `qwen2.5:3b`:
 ```
-[VERIFICATION 3] Live Remote Ollama 5-Job Execution Report (Host: http://10.134.74.60:11434):
+[VERIFICATION 3] Live Remote Ollama 5-Job Execution Report (Host: http://<OLLAMA_HOST>:11434):
 Total Wall Clock Duration: ~17s
   - Job #1: status=done, duration=~6.9s, score=100
   - Job #2: status=done, duration=~2.2s, score=100

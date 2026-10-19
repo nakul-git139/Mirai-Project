@@ -23,7 +23,7 @@ def test_ollama_payload_options_and_keep_alive():
     """Verify temperature 0, seed 42, num_ctx 8192, and keep_alive '60m' are injected."""
     adapter = OllamaAdapter(
         model="qwen2.5:3b",
-        base_url="http://10.134.74.60:11434",
+        base_url="http://localhost:11434",
         seed=42,
         num_ctx=8192,
         keep_alive="60m",
@@ -42,11 +42,11 @@ def test_ollama_payload_options_and_keep_alive():
 
 def test_ollama_base_url_and_model_configurable_via_env(monkeypatch):
     """Verify OLLAMA_BASE_URL and OLLAMA_MODEL environment variables are respected."""
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://10.134.74.60:11434")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama-test-host:11434")
     monkeypatch.setenv("OLLAMA_MODEL", "qwen2.5:3b")
 
     defaults = get_default_settings()
-    assert defaults["ollama_base_url"] == "http://10.134.74.60:11434"
+    assert defaults["ollama_base_url"] == "http://ollama-test-host:11434"
     assert defaults["model"] == "qwen2.5:3b"
 
 
@@ -165,8 +165,8 @@ def test_timing_logs_endpoint_requires_admin(client, student_auth_headers, admin
 
 @pytest.mark.live
 def test_live_remote_ollama_connectivity_and_generation():
-    """Live connectivity and generation verification against remote Ollama server (http://10.134.74.27:11434)."""
-    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://10.134.74.60:11434")
+    """Live connectivity and generation verification against remote Ollama server (http://<OLLAMA_HOST>:11434)."""
+    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
     adapter = OllamaAdapter(model="qwen2.5:3b", base_url=ollama_url, timeout=60.0)
     response = adapter.generate([LLMMessage(role="user", content="Ping test. Respond with 'READY'.")])
     assert len(response.content) > 0
@@ -175,7 +175,7 @@ def test_live_remote_ollama_connectivity_and_generation():
 @pytest.mark.live
 def test_live_remote_ollama_structured_json():
     """Live structured JSON generation verification against remote Ollama."""
-    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://10.134.74.60:11434")
+    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
     adapter = OllamaAdapter(model="qwen2.5:3b", base_url=ollama_url, timeout=60.0)
     result: DummyOutputSchema = generate_structured_output(
         adapter=adapter,

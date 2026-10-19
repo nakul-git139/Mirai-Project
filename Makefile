@@ -9,7 +9,7 @@ help:
 	@echo "  make dev       - Bootstrap dependencies if needed and launch backend + frontend"
 	@echo "  make test      - Run fast offline backend unit & integration tests"
 	@echo "  make test-e2e  - Run Playwright browser flow with isolated test database"
-	@echo "  make test-live - Run live remote Ollama tests (http://10.134.74.60:11434)"
+	@echo "  make test-live - Run live remote Ollama tests (http://<OLLAMA_HOST>:11434)"
 	@echo "  make seed      - Seed database with admin, demo student, and 5 sample profiles"
 	@echo "  make clean     - Wipe virtual environment, node_modules, and local database"
 
@@ -32,7 +32,7 @@ test-e2e: setup-backend setup-frontend
 	@bash scripts/run_e2e.sh
 
 test-live: setup-backend
-	@echo "Running live remote Ollama tests with pytest against http://10.134.74.60:11434..."
+	@echo "Running live remote Ollama tests with pytest against http://<OLLAMA_HOST>:11434..."
 	$(BIN)/pytest -m live -v -o addopts=""
 
 seed: setup-backend

@@ -302,7 +302,7 @@
 ---
 
 ## [2026-10-19] Module 12: Ollama Robustness for Slow CPU Inference
-- **Target Host**: `http://10.134.74.27:11434` (`qwen2.5:3b`)
+- **Target Host**: `http://<OLLAMA_HOST>:11434` (`qwen2.5:3b`)
 - **Command**: `PYTHONPATH=backend backend/venv/bin/pytest backend/tests/test_ollama_robustness.py backend/tests/test_resume_review.py backend/tests/test_linkedin_review.py backend/tests/test_github_review.py -v`
 - **Output**: 
   - 28 passed, 5 warnings in 13.50s
@@ -314,7 +314,7 @@
   - Timing & Token Audit Logger: implemented `backend/app/services/timing_logger.py`, persisting to SQLite table `llm_timing_logs` and JSONL file `backend/data/llm_timing.jsonl`, accessible via `GET /api/settings/timing-logs`.
   - Configurable Settings: `OLLAMA_BASE_URL` and `OLLAMA_MODEL` environment variable support and Settings API integration.
   - UI Progress Indicator: created `frontend/src/components/OllamaProgressIndicator.jsx` with live elapsed timer, stage checklist, and animated progress bar; integrated across Resume, LinkedIn, and GitHub review pages (`npm run build` passed in 412ms).
-  - Real Remote Ollama Verification: executed live against `http://10.134.74.27:11434` with `qwen2.5:3b`:
+  - Real Remote Ollama Verification: executed live against `http://<OLLAMA_HOST>:11434` with `qwen2.5:3b`:
     - Resume Review: 90/100 (4.26s, 310 prompt tokens, 39 output tokens)
     - LinkedIn Review: 100/100 (18.13s, 273 prompt tokens, 77 output tokens)
     - GitHub Review: High Readability (7.58s, 333 prompt tokens, 63 output tokens)
@@ -326,7 +326,7 @@
 
 ## [2026-10-19] Module 12 Verification & Pre-Commit Audit
 - **Commands Executed**:
-  1. `make test`: All 121 tests passed (1 skipped browser e2e test) in 785.55s (13:05), including 10 live remote Ollama CPU evaluations in `test_interview.py` at `http://10.134.74.27:11434` with 0 failures and 0 timeouts.
+  1. `make test`: All 121 tests passed (1 skipped browser e2e test) in 785.55s (13:05), including 10 live remote Ollama CPU evaluations in `test_interview.py` at `http://<OLLAMA_HOST>:11434` with 0 failures and 0 timeouts.
   2. `PYTHONPATH=backend backend/venv/bin/pytest backend/tests/test_ollama_robustness.py -v`: 8/8 passed in 0.11s, including `test_timing_logs_endpoint_requires_admin`.
   3. `PYTHONPATH=backend backend/venv/bin/python3 backend/scripts/verify_weak_and_repeatability.py`:
      - Resume Review: Strong resume scored 100/100; weak resume scored 65/100 (-35 pts). 5 runs: Strong `[100, 100, 100, 100, 100]`, Weak `[65, 65, 65, 65, 65]` (0 variance).
@@ -343,7 +343,7 @@
 ## [2026-10-19] Fast Offline Testing, pyspellchecker & Python 3.11 Audit
 - **Commands Executed**:
   1. `make test`: 122 passed, 1 skipped, 3 deselected in 115.84s (0:01:55). Runtime reduced by 85.3% (down from 13:05). All live Ollama tests segregated behind `@pytest.mark.live`.
-  2. `make test-live`: 3 passed, 123 deselected in 264.60s (0:04:24) against live remote Ollama at `http://10.134.74.27:11434` with `qwen2.5:3b`.
+  2. `make test-live`: 3 passed, 123 deselected in 264.60s (0:04:24) against live remote Ollama at `http://<OLLAMA_HOST>:11434` with `qwen2.5:3b`.
   3. `backend/venv/bin/pytest backend/tests/test_resume_review.py -k test_spelling_checker_library_and_grammar_limitations -v`: Passed in 0.53s. Caught `recieve`, `enviroment`, `teh`, `definately`. Documented that `"I has worked on the project"` is not caught by word-level spell check because all individual words exist in the dictionary.
   4. `backend/tests/test_browser_tracker_flow.py`: Verified skipped due to Vite dev server offline during backend pytest. When servers started (ports 8000 & 5173), all 5 dual-session browser steps passed in 64.07s.
   5. `backend/venv_py311/bin/pytest -v`: 122 passed, 1 skipped, 3 deselected in 79.65s (0:01:19) under Python 3.11.17. 0 failures, 0 syntax/runtime breakages.
@@ -361,7 +361,7 @@
 ---
 
 ## [2026-10-19] Module 13: Background Job Queue, Concurrency Limits & Rate Limiting
-- **Target Host**: `http://10.134.74.60:11434` (Ollama models: `qwen2.5:3b`, `qwen2.5:7b`)
+- **Target Host**: `http://<OLLAMA_HOST>:11434` (Ollama models: `qwen2.5:3b`, `qwen2.5:7b`)
 - **Commands Executed**:
   1. `backend/venv/bin/pytest backend/tests/test_concurrency_and_queue.py -v -m "not live"`:
      - 6/6 passed in 5.56s.
@@ -373,7 +373,7 @@
      - Admin authorization: `/api/admin/llm-queue` enforced 401 unauth -> 403 student -> 200 admin with full telemetry.
   2. `backend/venv/bin/pytest backend/tests/test_concurrency_and_queue.py::test_live_remote_ollama_five_concurrent_reviews -v -s -o addopts=""`:
      - 1/1 passed in 17.16s.
-     - 5 simultaneous real resume review jobs queued to remote Ollama at `http://10.134.74.60:11434` (`qwen2.5:3b`) completed sequentially:
+     - 5 simultaneous real resume review jobs queued to remote Ollama at `http://<OLLAMA_HOST>:11434` (`qwen2.5:3b`) completed sequentially:
        - Job 1: 6.93s, score 100
        - Job 2: 2.23s, score 100
        - Job 3: 2.38s, score 100
@@ -401,8 +401,8 @@
 | **3. Job Discovery & Ranking** | `tests/test_job_matching.py`<br>`backend/tests/test_jobs.py` | • Multi-profile ranking: Frontend student matched React/Next.js (92%), Backend matched Python/Go (88%), Data Scientist matched PyTorch/Pandas (90%).<br>• Deduplication: Retained single richer record across Greenhouse, Lever, and RSS feeds. In-memory TTL cache eliminates external stampedes with `asyncio.Lock`. | **PASSED** |
 | **4. Application Tracker & MSOT E2E** | `tests/test_tracker_msot_e2e.py`<br>`backend/tests/test_browser_tracker_flow.py` (`make test-e2e`) | • 5-step dual-session Playwright browser flow verified:<br>  1. Admin posted restricted campus opening with readiness gate ($\ge 70$).<br>  2. Ineligible student filtered out.<br>  3. Eligible student viewed pinned job, applied via 1-click, card appeared in Kanban & Table.<br>  4. Admin triaged candidate and promoted to 'Interview'.<br>  5. Student verified movement tag and status transition history. | **PASSED** (52.69s) |
 | **5. Privacy, Deletion & Secrets** | `tests/test_privacy_deletion.py`<br>`backend/tests/test_profile.py`<br>Git History Audit Script | • Consent gate blocks unconsented access (HTTP 400).<br>• Profile data wipe physically unlinks resume files from `backend/data/uploads/`.<br>• Account deletion cascades across all DB tables and unlinks all screenshots.<br>• Tenant isolation verified: Student A receives HTTP 403 on Student B's data.<br>• Git scan verified: 0 `.env` files, 0 real resumes, 0 committed API keys across full history. | **PASSED** |
-| **6. LLM Background Queue & Limits** | `backend/tests/test_concurrency_and_queue.py`<br>`backend/app/services/job_queue.py` | • Non-blocking `ThreadPoolExecutor` returns immediate HTTP 202 with `job_id` and FIFO queue position.<br>• Provider semaphores enforced: Ollama = 1 (sequential queue), Hosted/Mock = 10.<br>• Sliding-window rate limit: 10 reviews/hour with HTTP 429 and `Retry-After: 3600`.<br>• Remote Ollama verified: 5 concurrent resume reviews executed sequentially in 17.16s. | **PASSED** |
-| **7. Server Concurrency Load Test** | `tests/locustfile.py`<br>Locust 125-User Headless Runner | • Simulated 125 concurrent users over 30s against Mock LLM (zero Ollama load).<br>• Total requests: 3,499 requests.<br>• Error rate: **0.00%** (0 failures).<br>• Sustained throughput: **118.03 req/s**.<br>• Latency: p50 = **3 ms**, p95 = **18 ms**, p99 = **46 ms**, Max = **76 ms**. | **PASSED** |
+| **6. LLM Background Queue & Limits** | `backend/tests/test_concurrency_and_queue.py`<br>`backend/app/services/job_queue.py`<br>Report: [13-background-jobs-concurrency-ratelimits-report.md](file:///Users/nakulmirai/Mirai%20Project/docs/verification/13-background-jobs-concurrency-ratelimits-report.md) | • Non-blocking `ThreadPoolExecutor` returns immediate HTTP 202 with `job_id` and FIFO queue position.<br>• Provider semaphores enforced: Ollama = 1 (sequential queue), Hosted/Mock = 10.<br>• Sliding-window rate limit: 10 reviews/hour with HTTP 429 and `Retry-After: 3600`.<br>• Remote Ollama verified: 5 concurrent resume reviews executed sequentially in 17.16s.<br>• Verification Report: `docs/verification/13-background-jobs-concurrency-ratelimits-report.md`. | **PASSED** |
+| **7. Server Concurrency Load Test** | `tests/locustfile.py`<br>Locust 125-User Headless Runner | • **Read-Only Endpoints**: Simulated 125 concurrent users over 30s against Mock LLM (3,499 requests, 0% errors, 118 req/s, p50: 3ms, p95: 18ms). *Note: Earlier numbers covered read endpoints only.*<br>• **Review Queue Submissions**: 125 concurrent students submitted resume reviews through the job queue with Mock LLM sleeping 1.0s and concurrency limit = 10. Total 9,825 requests (125 reviews + 9,700 status polls), **0.00% error rate**.<br>  - Submit latency (`POST /api/jobs/trigger`): p50 = **49 ms**, p95 = **94 ms**.<br>  - Queue wait time: p50 = **11.1 ms**, p95 = **1,233.6 ms** (1.23 s).<br>  - Total completion time: p50 = **1,019.6 ms** (1.02 s), p95 = **2,045.1 ms** (2.05 s). | **PASSED** |
 
 ---
 
@@ -426,12 +426,69 @@ While all automated tests, Playwright browser sessions, and Locust load tests ha
 ---
 
 ### 3. Final Verification Commands & Status Summary
-- `make test`: **128 passed, 1 skipped, 4 deselected in 78.55s** (0 failures).
-- `make test-e2e`: **1 passed (5 browser steps verified) in 52.69s**.
-- `backend/venv/bin/pytest tests/ -v`: **10/10 passed in 5.05s**.
-- `tests/calculate_token_cost.py`: Executed cleanly; active review journey costs **$0.00020/student** on Gemini 1.5 Flash and **$0.00** on local Ollama.
-- `make seed`: Populated admin, demo student, and 5 diverse sample students across all placement readiness tiers.
-- **Status**: **SUBMISSION READY (All automated criteria verified)**.
+- `make test`: **130 passed, 1 skipped, 4 deselected in 74.12s (0:01:14)** (0 failures, executed on Apple M2 local host; previously 105.89s with 128 passed).
+- `make test-e2e`: **1 passed (5 browser steps verified) in 52.69s** (executed on Apple M2 local host).
+- `backend/venv/bin/pytest tests/ -v`: **10/10 passed in 4.92s** (executed on Apple M2 local host).
+- `tests/calculate_token_cost.py`: Executed cleanly with `backend/app/pricing_config.json`; all prices marked as unverified placeholders (`verified: false`, `date_checked: null`).
+- `make seed`: Populated admin, demo student, and 5 diverse sample students across all placement readiness tiers using real scoring pipeline.
+- `gitleaks git --verbose`: Scanned full history (2 commits, 8.54 MB); 0 leaks found with scoped `.gitleaks.toml`.
+- `docs/design-document.pdf`: Exported from Markdown via Playwright Chromium; verified exactly **3 pages**.
+- **Status**: **SUBMISSION READY (All security, repo hygiene, pricing, and verification criteria met)**.
+
+---
+
+## Changes (2026-10-19 — Pre-Commit Security & Hygiene Audit)
+- **Security & Secret Key Enforcement**:
+  - Removed the hardcoded fallback secret key from `backend/app/config.py`.
+  - Implemented `resolve_secret_key()`: strictly reads `SECRET_KEY` from the environment or `.env`.
+  - In development mode, auto-generates a secure 32-byte urlsafe key and appends it to gitignored `.env`.
+  - In production mode (`APP_ENV=production`), immediately refuses to start with `RuntimeError` if `SECRET_KEY` is missing or empty.
+  - Treated the legacy key `mirai_placement_copilot_secret_jwt_key_2026` as compromised; rejects it with `RuntimeError` if supplied.
+  - Created `.env.example` at project root and added `.env` / `*.env` to `.gitignore`.
+  - Added unit tests in `backend/tests/test_settings.py`: `test_production_startup_fails_without_secret_key` and `test_compromised_legacy_key_rejected`.
+- **Secret Scanner & Test Key De-Identification**:
+  - Replaced realistic static secret fixtures in `backend/tests/test_github_review.py`, `tests/test_github_livelinks.py`, and `backend/tests/test_settings.py` with runtime-assembled string concatenations.
+  - Added `.gitleaks.toml` allowlist limited to specific test files and documentation reports.
+  - Re-ran `gitleaks git --verbose` across full git history: scanned all 2 commits with 0 leaks found. Total commits: **2**.
+- **Repository Hygiene Verification**:
+  - Tracked files count: `git ls-files | wc -l` = **192**.
+  - Verified 15 largest tracked files (largest: `backend/tests/fixtures/resume_image_only.pdf` at 6.38 MB).
+  - Confirmed zero `.db`, `uploads/`, `venv`, `node_modules`, `llm_timing.jsonl`, or personal student resumes/screenshots are tracked in git.
+- **Unverified Placeholder Pricing Configuration**:
+  - Moved provider pricing into `backend/app/pricing_config.json` with explicit fields: `provider`, `model`, `input_price_per_1m`, `output_price_per_1m`, `source_url`, `date_checked: null`, and `verified: false`.
+  - Updated `tests/calculate_token_cost.py` and `README.md` disclaimer: explicitly marked all pricing figures as unverified placeholders for user confirmation against billing consoles. Removed invented verification dates.
+- **Design Document PDF Export**:
+  - Removed untested hardware performance claims (AMD Ryzen 7 3700U) from `docs/design-document.md`. Documented only tested hardware (Apple M2 local host, remote Ollama LAN host).
+  - Exported `docs/design-document.md` to `docs/design-document.pdf` using Playwright Chromium headless print engine. Verified exact page count: **3 pages** ($\le 3$ pages).
+- **Consistent Machine Timing Documentation**:
+  - Explicitly attributed every benchmark and test duration to its source machine and run context:
+    - Apple M2 (local host): `make test` offline suite = **74.12s** (130 passed, 1 skipped, 4 deselected; previously 105.89s with 128 passed).
+    - Remote Ollama LAN host (`<OLLAMA_HOST>:11434`): un-mocked CPU test suite = **785.55s** (121 passed with 10 live interview turns).
+    - Apple M2: `make test-e2e` browser lifecycle = **52.69s**.
+    - Apple M2: `pytest tests/ -v` challenge suite = **4.92s**.
+    - Apple M2: Locust read-only test = 3,499 reqs, 118 req/s, p50 3ms.
+    - Apple M2: Locust review-queue test = 9,825 reqs, 284.4 req/s, 125 submissions, p50 submit 49ms, p50 queue wait 11.1ms, p50 completion 1,019.6ms.
+
+## Changes (2026-10-19 — Pre-Commit Final Polish & Verification Audit)
+- **Empirical Hardware Benchmarks & Design Document**:
+  - Restored measured remote Ollama result: app ran on Mac (`Apple M2`, verified via `sysctl -n machdep.cpu.brand_string`), remote Ollama ran on separate CPU-only Windows laptop (AMD Ryzen 7 3700U, 16 GB RAM) with `qwen2.5:3b` measured at ~5.15 tokens/s via `ollama run --verbose`.
+  - Scrubbed all IP addresses from docs, `README.md`, `Makefile`, and codebase; replaced with `<OLLAMA_HOST>` placeholder.
+  - Re-exported `docs/design-document.pdf` (**2 pages**, $\le 3$ pages) with Mermaid.js SVG rendering.
+  - Rendered PDF pages to PNG (`scratch/pdf_pages/page_1.png` and `page_2.png`); confirmed architecture diagram renders visually.
+- **Secrets & Gitleaks Allowlist Audit**:
+  - Removed `backend/app/config.py` from `.gitleaks.toml` allowlist.
+  - Replaced plaintext compromised key in `backend/app/config.py` with `COMPROMISED_DEV_DIGEST`.
+  - Executed `gitleaks git --no-banner --log-opts="--all"` and `gitleaks dir .`: 0 leaks found across both scans. Total commits: **2**.
+- **Repo Size Reduction & Tracked Files**:
+  - Compressed `backend/tests/fixtures/resume_image_only.pdf` from 6.38 MB to **12.4 KB**; tests pass in 0.49s.
+  - Untracked 6 audio files in `backend/data/` via `git rm --cached`.
+  - Refactored `backend/tests/test_voice.py` to use compact fixture `backend/tests/fixtures/audio/speech_sample.wav` (120.9 KB); voice tests pass in 1.76s.
+  - Total tracked files: `git ls-files | wc -l` = **187** (down from 192). Largest tracked file is now a 351 KB documentation screenshot.
+- **Full Test Suite Execution (`make test`)**:
+  - Command: `make test`
+  - Real output: `130 passed, 1 skipped, 4 deselected, 5 warnings in 74.12s (0:01:14)`. Zero failures, zero regressions.
+
+
 
 
 

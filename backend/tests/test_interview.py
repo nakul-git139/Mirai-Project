@@ -118,7 +118,7 @@ def test_question_generation_grounded_in_resume():
 @pytest.mark.live
 def test_three_scripted_sessions_score_ordering():
     """
-    Live test against remote Ollama server (http://10.134.74.27:11434).
+    Live test against remote Ollama server (http://<OLLAMA_HOST>:11434).
     Runs 3 scripted answer profiles against the fixed rubric:
       - Strong answerer: detailed architecture, STAR framing, specific metrics.
       - Weak answerer: one-word / terse responses ('yes', 'python').
@@ -129,7 +129,8 @@ def test_three_scripted_sessions_score_ordering():
       weak_score <= 45
     """
     from app.llm.adapters.ollama_adapter import OllamaAdapter
-    ollama_adapter = OllamaAdapter(model="qwen2.5:3b", base_url="http://10.134.74.27:11434", timeout=60.0)
+    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+    ollama_adapter = OllamaAdapter(model="qwen2.5:3b", base_url=ollama_url, timeout=60.0)
 
     q_tech = {
         "id": "Q1",

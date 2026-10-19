@@ -1,0 +1,4 @@
+# The historical development SECRET_KEY committed in commit a038815 (V1) is blacklisted
+# at startup via resolve_secret_key() and treated as permanently compromised.
+# In production, startup fails with RuntimeError if this key is provided.
+a03881556bf88e4d8178b05c78b58d6643c83bf7:backend/app/config.py:generic-api-key:10

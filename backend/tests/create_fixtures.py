@@ -321,16 +321,16 @@ def create_resume_image_only() -> str:
         fontsize=12,
         fontname="helv",
     )
-    # Render the page to a raster pixmap
-    pix = temp_page.get_pixmap(dpi=150)
-    img_bytes = pix.tobytes("png")
+    # Render the page to a raster pixmap with compact dpi
+    pix = temp_page.get_pixmap(dpi=72)
+    img_bytes = pix.tobytes("jpeg", jpg_quality=60)
     temp_doc.close()
 
     # Step 2: Create image-only PDF inserting the raster image with ZERO text stream
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     page.insert_image(fitz.Rect(0, 0, 595, 842), stream=img_bytes)
-    doc.save(path)
+    doc.save(path, deflate=True, garbage=4)
     doc.close()
     return path
 

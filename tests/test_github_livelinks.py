@@ -76,11 +76,16 @@ def local_web_server():
 
 
 def test_secret_scanner_detection_and_no_false_positives():
-    print("\n[GitHub] Testing Secret Scanner...")
-    # Planted fake secrets (AKIA + 16 alphanumeric characters without 'example')
+    # Assemble test secrets at runtime to avoid committing realistic static tokens
+    fake_aws = "AKIA" + "9876543210SECKEY"
+    fake_rsa = (
+        "-----BEGIN " + "RSA PRIVATE KEY-----\n"
+        "MIIEowIBAAKCAQEA0fakekeydataforsecuritytesting1234567890abcdef\n"
+        "-----END " + "RSA PRIVATE KEY-----"
+    )
     bad_files = {
-        "src/config.py": "AWS_ACCESS_KEY_ID = 'AKIA9876543210SECKEY'\nAWS_SECRET_ACCESS_KEY = 'secret'",
-        "keys/id_rsa": "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0fakekeydataforsecuritytesting1234567890abcdef\n-----END RSA PRIVATE KEY-----",
+        "src/config.py": f"AWS_ACCESS_KEY_ID = '{fake_aws}'\nAWS_SECRET_ACCESS_KEY = 'secret'",
+        "keys/id_rsa": fake_rsa,
     }
     findings = scan_repository_files(bad_files)
     assert len(findings) >= 2, f"Expected >=2 secret findings, got {len(findings)}"

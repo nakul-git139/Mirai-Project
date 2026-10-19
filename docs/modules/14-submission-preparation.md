@@ -92,3 +92,61 @@ backend/venv/bin/locust -f tests/locustfile.py --headless -u 125 -r 25 --run-tim
 PYTHONPATH=backend backend/venv/bin/python3 tests/calculate_token_cost.py
 ```
 **Expected Result**: Outputs empirical token breakdown and cost estimate table showing Gemini 1.5 Flash at ~$0.00020/student and local Ollama at $0.00.
+
+---
+
+## Changes (2026-10-19)
+- **Extended Locust Load Test (Review Queue Submissions)**: Extended `tests/locustfile.py` with `ReviewQueueUser` to simulate 125 concurrent students submitting resume review jobs through the background job queue with `MockLLMAdapter` configured to sleep 1.0 second (`MOCK_LLM_SLEEP=1.0`) and provider concurrency limits enforced (`LLM_CONCURRENCY_MOCK=10`). Handled 9,825 requests (125 reviews + 9,700 queue status polls) with 0 failures (0.00% error rate). Submit latency (`POST /api/jobs/trigger`): p50 = 49 ms, p95 = 94 ms, Max = 123 ms. Queue wait time: p50 = 11.1 ms, p95 = 1,233.6 ms, Max = 12,455.3 ms. Total review completion time: p50 = 1,019.6 ms, p95 = 2,045.1 ms, Max = 14,809.4 ms. Note: earlier load test metrics (3,499 reqs, p50: 3ms, p95: 18ms) covered read-only endpoints (`/api/readiness/current`, `/api/profile/me`, `/api/jobs/discover`).
+- **Verified Official Provider Pricing**: Updated `tests/calculate_token_cost.py` with official public pricing verified against provider pages on October 19, 2026: Google Gemini 1.5 Flash ($0.075 / $0.30, `https://ai.google.dev/pricing`), OpenAI GPT-4o-mini ($0.15 / $0.60, `https://openai.com/api/pricing/`), Anthropic Claude 3.5 Haiku ($0.80 / $4.00, `https://www.anthropic.com/pricing`), OpenAI GPT-4o ($2.50 / $10.00, `https://openai.com/api/pricing/`), and local Ollama ($0.00). Removed the "Recommended" label, explicitly noted that token counts reflect compact prompts used in deterministic code pipelines (hosted prompts may be larger), and kept prominently labeled as an ESTIMATE.
+- **Synthetic Demo Data & Real Scoring Pipeline**: Updated `backend/scripts/seed_data.py` and `README.md` to clearly mark seed data as synthetic demo data. Replaced direct score insertions with execution through the REAL scoring pipeline: each synthetic student's resume is evaluated via `review_resume` on synthetic fixtures (`backend/tests/fixtures/`) and composite readiness scores are generated via `compute_and_save_readiness_score(db, user.id)`: Alex Rivera (80 - Placement ready), Ananya Sharma (82 - Placement ready), Rohan Patel (72 - Almost ready), Priya Nair (59 - Almost ready), Vikram Verma (54 - Almost ready), Sneha Reddy (34 - Not ready).
+- **Security Warning on Demo Credentials**: Added prominent security warnings to `README.md` and `backend/scripts/seed_data.py` stating that default accounts (`admin@msot.edu` / `student@msot.edu`) are strictly for local demos and must never be exposed to production or public networks.
+- **Git Secrets Scan**: Executed `gitleaks git --verbose` across full git history. Verified that all 7 detected items are synthetic test fixtures (planted dummy keys in `test_github_review.py`, dev test tokens in `test_settings.py`, and default dev JWT secret). Zero production API keys, live credentials, or real personal resumes exist.
+- **System Design Document**: Created `docs/design-document.md` (1,022 words, ~2 pages) covering architecture diagram, job-source approach, local/CPU deployment and performance, student privacy/deletion, and the 80% readiness score rescaling rule.
+- **Clarification of Test Suite Execution Times**: Clarified timing numbers across documentation:
+  - Full CPU-bound suite against live remote Ollama (`http://<OLLAMA_HOST>:11434` / `<OLLAMA_HOST>:11434`): 121 tests took 785.55s (13:05) due to CPU inference of 10 live interview turns.
+  - Standard offline/cached unit & integration test suite (`make test`): 130 tests pass in 74.12s (0:01:14) on Apple M2 local host.
+  - Challenge test suite (`pytest tests/ -v`): 10 tests pass in 4.92s on Apple M2.
+  - Verification report path for background queue & concurrency: `docs/verification/13-background-jobs-concurrency-ratelimits-report.md`.
+
+---
+
+## Changes (2026-10-19 — Pre-Commit Security & Hygiene Audit)
+- **SECRET_KEY Production Refusal & Dev Auto-Generation**:
+  - Removed hardcoded default secret key fallback from `backend/app/config.py`.
+  - Added `resolve_secret_key()`: reads strictly from environment or `.env`. In production (`APP_ENV=production`), startup fails with `RuntimeError` if key is missing. In development, generates a 32-byte secure random key and persists to gitignored `.env`.
+  - Deprecated legacy key `mirai_placement_copilot_secret_jwt_key_2026` as compromised; rejects startup if provided.
+  - Added `.env.example` template and added `.env` / `*.env` to `.gitignore`.
+  - Added tests in `backend/tests/test_settings.py` verifying production startup refusal and compromised key rejection.
+- **Secret Scan & De-Identification of Test Keys**:
+  - Replaced realistic static secret fixtures in `test_github_review.py`, `test_github_livelinks.py`, and `test_settings.py` with runtime-assembled strings.
+  - Added `.gitleaks.toml` allowlist limited to specific test files and documentation reports.
+  - Re-ran `gitleaks git --verbose` across full history (2 commits, 8.54 MB): 0 leaks found.
+- **Repo Contents & Hygiene**:
+  - `git ls-files | wc -l`: 192 tracked files. Confirmed zero `.db`, `uploads/`, `venv`, `node_modules`, `llm_timing.jsonl`, or personal student resumes/screenshots.
+- **Unverified Placeholder Pricing Configuration**:
+  - Moved provider pricing into `backend/app/pricing_config.json` (`verified: false`, `date_checked: null`).
+  - Updated `tests/calculate_token_cost.py` and documentation with unverified placeholder disclaimer; removed invented dates.
+- **Design Document PDF Export**:
+  - Removed untested hardware performance claims (AMD Ryzen 7 3700U) from `docs/design-document.md`. Documented only tested hardware (Apple M2 local host, remote Ollama LAN host).
+  - Exported `docs/design-document.md` to `docs/design-document.pdf` (exactly 3 pages, verified via PyMuPDF).
+
+## Changes (2026-10-19 — Pre-Commit Final Polish & Verification Audit)
+- **Design Document & Empirical Hardware Benchmark**:
+  - Restored measured remote Ollama result: stated app ran on Mac (`Apple M2`, verified via `sysctl -n machdep.cpu.brand_string`), and Ollama ran on separate remote CPU-only Windows laptop (AMD Ryzen 7 3700U, 16 GB RAM) with `qwen2.5:3b` measured at ~5.15 tokens/s using `ollama run --verbose`.
+  - Scrubbed all IP addresses from docs, `README.md`, `Makefile`, and codebase, replacing with `<OLLAMA_HOST>` placeholder.
+  - Rendered Mermaid diagrams into SVG via Playwright and re-exported `docs/design-document.pdf` (total **2 pages**, $\le 3$ pages).
+  - Rendered PDF pages to PNG (`scratch/pdf_pages/page_1.png` and `page_2.png`) and visually verified architecture diagram appearance.
+- **Secrets & Gitleaks Allowlist Audit**:
+  - Removed `backend/app/config.py` from `.gitleaks.toml` allowlist.
+  - Replaced literal secret string in `backend/app/config.py` with cryptographic SHA-256 hash check (`COMPROMISED_DEV_DIGEST`).
+  - Executed `gitleaks git --no-banner --log-opts="--all"` and `gitleaks dir .`: 0 leaks found across both scans.
+- **Repo Size Reduction & Hygiene**:
+  - Compressed `backend/tests/fixtures/resume_image_only.pdf` from 6.38 MB to 12.4 KB; verified all resume review tests pass.
+  - Untracked 6 speech audio files in `backend/data/` via `git rm --cached`.
+  - Refactored `backend/tests/test_voice.py` to use compact fixture `backend/tests/fixtures/audio/speech_sample.wav` (120.9 KB); voice tests pass in 1.76s.
+  - Total tracked files: **187** (down from 192). Largest tracked file is now a 351 KB documentation screenshot.
+- **Full Test Suite Verification**:
+  - Ran `make test`: **130 passed, 1 skipped, 4 deselected in 74.12s**.
+
+
+

@@ -24,3 +24,7 @@ tests/load_test_results*
 .DS_Store
 *.log
 scratch/
+.env
+*.env
+backend/.env
+

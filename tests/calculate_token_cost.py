@@ -2,10 +2,11 @@
 """
 Token Accounting & API Cost Estimation Tool for Placement Readiness Copilot:
 Calculates cost per student in API mode directly from empirical token counts recorded
-in the LLM timing log (`backend/data/llm_timing.jsonl`) with transparent, clearly stated
-pricing assumptions.
+in the LLM timing log (`backend/data/llm_timing.jsonl`).
 
-Marked prominently as an ESTIMATE based on empirical samples.
+DISCLAIMER: All prices below are UNVERIFIED PLACEHOLDERS loaded from
+`backend/app/pricing_config.json` for the user to confirm against official billing consoles.
+No verification date is claimed or invented.
 """
 import os
 import sys
@@ -18,6 +19,26 @@ if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
 TIMING_LOG_PATH = os.path.join(BACKEND_DIR, "data", "llm_timing.jsonl")
+PRICING_CONFIG_PATH = os.path.join(BACKEND_DIR, "app", "pricing_config.json")
+
+
+def load_pricing_config():
+    """Load pricing assumptions from config file."""
+    if os.path.exists(PRICING_CONFIG_PATH):
+        with open(PRICING_CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return [
+        {
+            "provider": "ollama",
+            "model": "qwen2.5:3b",
+            "display_name": "Local Ollama (qwen2.5:3b / 7b)",
+            "input_price_per_1m": 0.0,
+            "output_price_per_1m": 0.0,
+            "source_url": "Self-hosted weights (Private LAN)",
+            "date_checked": None,
+            "verified": False,
+        }
+    ]
 
 
 def load_empirical_token_stats():
@@ -56,6 +77,7 @@ def load_empirical_token_stats():
 
 def calculate_costs():
     emp = load_empirical_token_stats()
+    providers = load_pricing_config()
 
     # Empirical values from timing log (with reliable fallbacks)
     resume_p = emp.get("resume_review_grammar", {}).get("avg_prompt", 370) + emp.get("resume_review_takeaway", {}).get("avg_prompt", 136)
@@ -87,85 +109,61 @@ def calculate_costs():
     full_out = active_out + interview_o
     full_total = full_in + full_out
 
-    # Pricing per 1 Million Tokens (Public pricing as of 2025/2026)
-    providers = [
-        {
-            "name": "Local Ollama (qwen2.5:3b / 7b)",
-            "rate_in": 0.0,
-            "rate_out": 0.0,
-            "note": "Fully offline, private, zero API fees",
-        },
-        {
-            "name": "Google Gemini 1.5 Flash",
-            "rate_in": 0.075,
-            "rate_out": 0.30,
-            "note": "$0.075 / 1M in, $0.30 / 1M out (Recommended default)",
-        },
-        {
-            "name": "OpenAI gpt-4o-mini",
-            "rate_in": 0.15,
-            "rate_out": 0.60,
-            "note": "$0.15 / 1M in, $0.60 / 1M out",
-        },
-        {
-            "name": "Anthropic Claude 3.5 Haiku",
-            "rate_in": 0.80,
-            "rate_out": 4.00,
-            "note": "$0.80 / 1M in, $4.00 / 1M out",
-        },
-        {
-            "name": "OpenAI gpt-4o (Flagship)",
-            "rate_in": 2.50,
-            "rate_out": 10.00,
-            "note": "$2.50 / 1M in, $10.00 / 1M out",
-        },
-    ]
-
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 90)
     print(" PLACEMENT READINESS COPILOT - TOKEN ACCOUNTING & COST ESTIMATE")
-    print("=" * 80)
-    print(" NOTE: All calculations below are ESTIMATES derived from empirical token counts")
-    print(f" recorded in backend/data/llm_timing.jsonl across real model execution runs.")
-    print("=" * 80)
+    print("=" * 90)
+    print(" [UNVERIFIED PLACEHOLDER DISCLAIMER]")
+    print(" • All provider pricing rates below are UNVERIFIED PLACEHOLDERS loaded from")
+    print("   backend/app/pricing_config.json for the user to confirm.")
+    print(" • Verification Status: verified=False | date_checked=None (No verification claimed).")
+    print(" • Token counts reflect compact prompts used in our deterministic code pipeline.")
+    print("   Hosted prompts and system instructions in alternative implementations may be larger.")
+    print("=" * 90)
 
     print("\n[1] EMPIRICAL TOKEN USAGE BREAKDOWN:")
     print(f"  • Resume Review (Grammar + Takeaway):    {resume_p:>5} prompt in  |  {resume_o:>5} completion out")
     print(f"  • LinkedIn Review (Rewrites & Audit):   {linkedin_p:>5} prompt in  |  {linkedin_o:>5} completion out")
     print(f"  • GitHub Code Review (Modularity):      {github_p:>5} prompt in  |  {github_o:>5} completion out")
     print(f"  • Job Match Fit & Explanation:          {job_match_p:>5} prompt in  |  {job_match_o:>5} completion out")
-    print("  " + "-" * 70)
+    print("  " + "-" * 75)
     print(f"  SUBTOTAL [ACTIVE REVIEWS ONLY]:         {active_in:>5} prompt in  |  {active_out:>5} completion out  ({active_total:,} tokens)")
     print(f"\n  • Mock Interview (5 Turns + Grading):   {interview_p:>5} prompt in  |  {interview_o:>5} completion out")
-    print("  " + "-" * 70)
+    print("  " + "-" * 75)
     print(f"  TOTAL [FULL JOURNEY INCL. INTERVIEW]:   {full_in:>5} prompt in  |  {full_out:>5} completion out  ({full_total:,} tokens)")
 
-    print("\n[2] ESTIMATED COST PER STUDENT (ACTIVE REVIEWS - Interview Disabled):")
-    print(f"   {'Provider / Model':<30} | {'Input Cost':<12} | {'Output Cost':<12} | {'Cost / Student':<14} | {'Students / $1.00':<15}")
-    print("   " + "-" * 90)
+    print("\n[2] UNVERIFIED PLACEHOLDER COST PER STUDENT (ACTIVE REVIEWS - Interview Disabled):")
+    print(f"   {'Provider / Model':<28} | {'Input ($/1M)':<13} | {'Output ($/1M)':<13} | {'Cost/Student':<13} | {'Verified':<10}")
+    print("   " + "-" * 85)
     for p in providers:
-        c_in = (active_in / 1_000_000.0) * p["rate_in"]
-        c_out = (active_out / 1_000_000.0) * p["rate_out"]
+        rate_in = p["input_price_per_1m"]
+        rate_out = p["output_price_per_1m"]
+        c_in = (active_in / 1_000_000.0) * rate_in
+        c_out = (active_out / 1_000_000.0) * rate_out
         c_tot = c_in + c_out
-        per_dollar = f"{int(1.0 / c_tot):,}" if c_tot > 0 else "Unlimited ($0)"
-        print(f"   {p['name']:<30} | ${c_in:<11.6f} | ${c_out:<11.6f} | ${c_tot:<13.5f} | {per_dollar:<15}")
+        v_str = "True" if p.get("verified") else "False (Unverified)"
+        print(f"   {p['display_name']:<28} | ${rate_in:<12.3f} | ${rate_out:<12.3f} | ${c_tot:<12.5f} | {v_str:<10}")
 
-    print("\n[3] ESTIMATED COST PER STUDENT (FULL JOURNEY - With Mock Interview Enabled):")
-    print(f"   {'Provider / Model':<30} | {'Input Cost':<12} | {'Output Cost':<12} | {'Cost / Student':<14} | {'Students / $1.00':<15}")
-    print("   " + "-" * 90)
+    print("\n[3] UNVERIFIED PLACEHOLDER COST PER STUDENT (FULL JOURNEY - With Mock Interview):")
+    print(f"   {'Provider / Model':<28} | {'Input ($/1M)':<13} | {'Output ($/1M)':<13} | {'Cost/Student':<13} | {'Verified':<10}")
+    print("   " + "-" * 85)
     for p in providers:
-        c_in = (full_in / 1_000_000.0) * p["rate_in"]
-        c_out = (full_out / 1_000_000.0) * p["rate_out"]
+        rate_in = p["input_price_per_1m"]
+        rate_out = p["output_price_per_1m"]
+        c_in = (full_in / 1_000_000.0) * rate_in
+        c_out = (full_out / 1_000_000.0) * rate_out
         c_tot = c_in + c_out
-        per_dollar = f"{int(1.0 / c_tot):,}" if c_tot > 0 else "Unlimited ($0)"
-        print(f"   {p['name']:<30} | ${c_in:<11.6f} | ${c_out:<11.6f} | ${c_tot:<13.5f} | {per_dollar:<15}")
+        v_str = "True" if p.get("verified") else "False (Unverified)"
+        print(f"   {p['display_name']:<28} | ${rate_in:<12.3f} | ${rate_out:<12.3f} | ${c_tot:<12.5f} | {v_str:<10}")
 
-    print("\n" + "=" * 80)
-    print(" [ESTIMATE SUMMARY]")
-    print(" • For active reviews (Interview Disabled), Gemini 1.5 Flash costs ~$0.00019 per student (~5,300 students / $1.00).")
-    print(" • For active reviews (Interview Disabled), OpenAI gpt-4o-mini costs ~$0.00038 per student (~2,600 students / $1.00).")
-    print(" • When Mock Interview is enabled, Gemini 1.5 Flash costs ~$0.00091 per student (~1,100 students / $1.00).")
-    print(" • Local Ollama operates at $0.00 per student (zero external API expense).")
-    print("=" * 80 + "\n")
+    print("\n[4] PLACEHOLDER SOURCE URLS (User Confirmation Required):")
+    for p in providers:
+        print(f"   • {p['display_name']:<28}: {p['source_url']} (Date Checked: {p.get('date_checked')})")
+
+    print("\n" + "=" * 90)
+    print(" [SUMMARY]")
+    print(" • All rates are unverified placeholders loaded from backend/app/pricing_config.json.")
+    print(" • Local Ollama operates at $0.00 per student (self-hosted open weights).")
+    print("=" * 90 + "\n")
 
 
 if __name__ == "__main__":

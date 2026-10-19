@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from typing import List, Dict, Any, Optional
 from app.llm.base import BaseLLMAdapter, LLMMessage, LLMResponse
 
@@ -35,6 +36,11 @@ class MockLLMAdapter(BaseLLMAdapter):
     ) -> LLMResponse:
         self.call_count += 1
         self.received_messages.append(messages)
+
+        sleep_sec = float(os.environ.get("MOCK_LLM_SLEEP", "0.0"))
+        if sleep_sec > 0:
+            import time
+            time.sleep(sleep_sec)
 
         if self.response_queue:
             content = self.response_queue.pop(0)

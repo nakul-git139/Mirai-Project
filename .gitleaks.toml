@@ -1,0 +1,14 @@
+# Gitleaks configuration with allowlist strictly limited to synthetic test fixtures
+# and historical documentation files.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Permit synthetic test assertions and historical test reports containing dummy fixtures"
+paths = [
+    '''backend/tests/test_github_review\.py''',
+    '''backend/tests/test_settings\.py''',
+    '''tests/test_github_livelinks\.py''',
+    '''docs/verification/01-scaffold-report\.md''',
+]

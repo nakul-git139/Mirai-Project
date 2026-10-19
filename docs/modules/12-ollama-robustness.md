@@ -129,7 +129,7 @@ The module raises HTTP timeouts to 900s to avoid dropping slow inference request
 - **None**:
   - Zero hardcoded scores or fake review responses.
   - Zero mock responses when running against real Ollama.
-  - The live remote host at `http://10.134.74.27:11434` was directly invoked with `qwen2.5:3b` for real end-to-end verification.
+  - The live remote host at `http://<OLLAMA_HOST>:11434` was directly invoked with `qwen2.5:3b` for real end-to-end verification.
   - Unit tests use `MockLLMAdapter` exclusively to isolate network dependency during offline CI/unit testing.
 
 ---
@@ -138,7 +138,7 @@ The module raises HTTP timeouts to 900s to avoid dropping slow inference request
 
 ### Step 1: Inspect Ollama Settings and Network Reachability
 ```bash
-curl -s http://10.134.74.27:11434/api/tags | python3 -m json.tool
+curl -s http://<OLLAMA_HOST>:11434/api/tags | python3 -m json.tool
 ```
 *Expected Result*: Output lists `qwen2.5:3b` and `qwen2.5:7b` models without errors.
 
@@ -207,7 +207,7 @@ for l in logs:
   - Registered `@pytest.mark.live` in `pytest.ini` and `backend/pytest.ini` with `addopts = -m "not live"`.
   - Decorated tests calling remote Ollama (`test_three_scripted_sessions_score_ordering`, `test_live_remote_ollama_connectivity_and_generation`, `test_live_remote_ollama_structured_json`) with `@pytest.mark.live`.
   - In `test_interview.py`, added auto-use fixture providing `MockLLMAdapter` for non-live interview lifecycle tests (timer, edge cases, transcript DB updates) so no network calls occur during offline testing.
-  - Added `make test-live` (`pytest -m live -v -o addopts=""`) to execute only live tests against `http://10.134.74.27:11434`.
+  - Added `make test-live` (`pytest -m live -v -o addopts=""`) to execute only live tests against `http://<OLLAMA_HOST>:11434`.
   - Execution duration dropped from 13:05 (785.55s) to 1:55 (115.84s), an 85% speedup.
 - **Real Spell Checker Library (`pyspellchecker`)**:
   - Replaced hardcoded `COMMON_RESUME_TYPOS` dictionary in `backend/app/services/resume_reviewer.py` with `pyspellchecker.SpellChecker`.

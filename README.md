@@ -67,6 +67,10 @@ This single command automatically:
    - **React Frontend**: `http://localhost:5173`
 
 ### 2. Seed Demo Data (`make seed`)
+> ⚠️ **DEMO ENVIRONMENT WARNING**: Demo credentials (`admin@msot.edu` / `admin123`, `student@msot.edu` / `student123`) and sample student profiles are **strictly synthetic demo data** intended for local development and demonstration only. NEVER expose these default accounts or passwords to production environments.
+>
+> **Real Pipeline Execution**: All seeded readiness scores across the 5 sample candidates are **computed by running the real scoring pipeline** (`compute_and_save_readiness_score`) against synthetic fake resumes in `backend/tests/fixtures/`, rather than being inserted directly with arbitrary numbers.
+
 In a separate terminal, populate the database with staff credentials, a demo student, and 5 diverse sample students across all placement readiness tiers:
 ```bash
 make seed
@@ -84,7 +88,7 @@ make seed
   make test-e2e
   ```
 - **Live Ollama Inference Tests (`make test-live`)**:
-  Executes live remote Ollama tests against `http://10.134.74.60:11434` (configurable via `OLLAMA_BASE_URL`):
+  Executes live remote Ollama tests against `http://<OLLAMA_HOST>:11434` (configurable via `OLLAMA_BASE_URL`):
   ```bash
   make test-live
   ```
@@ -92,6 +96,15 @@ make seed
   ```bash
   ./backend/venv/bin/pytest tests/ -v
   ```
+
+---
+
+## Environment Configuration & Production Security
+
+Environment variables are loaded from the shell or `.env` file (template provided in `.env.example`):
+- **Development Mode (`APP_ENV=development`)**: If `SECRET_KEY` is not provided, the application auto-generates a secure 32-byte urlsafe key on startup and appends it to `.env` (gitignored).
+- **Production Mode (`APP_ENV=production`)**: The application **strictly refuses to start** with a fatal `RuntimeError` if `SECRET_KEY` is missing or empty.
+- **Compromised Key Blacklist**: The legacy development fallback key (`mirai_placement_copilot_secret_jwt_key_2026`) is treated as compromised and rejected with an immediate fatal error if supplied.
 
 ---
 
@@ -111,11 +124,11 @@ ollama pull qwen2.5:7b
 ```
 
 ### Option B: Remote Ollama Host (Network GPU / Server)
-If Ollama is hosted on a separate server or laptop (e.g. `http://10.134.74.60:11434` or custom URL):
+If Ollama is hosted on a separate server or laptop (e.g. `http://<OLLAMA_HOST>:11434` or custom URL):
 1. In the Copilot UI, open **Settings & Models** (`#nav-settings`).
-2. Set **Ollama Base URL** to `http://<server-ip>:11434`.
+2. Set **Ollama Base URL** to `http://<OLLAMA_HOST>:11434`.
 3. Set **Model** to `qwen2.5:3b` or `qwen2.5:7b`.
-4. Click **Save Settings** (or export `OLLAMA_BASE_URL=http://<server-ip>:11434` in your shell).
+4. Click **Save Settings** (or export `OLLAMA_BASE_URL=http://<OLLAMA_HOST>:11434` in your shell).
 5. All resume reviews, LinkedIn audits, and placement scores will now execute via Ollama at `$0.00` API cost.
 
 > **Note on Mock Interview**: The voice & text mock interview module is fully built, but intentionally disabled behind `ENABLE_MOCK_INTERVIEW=False` for the submission. The Placement Readiness Score automatically applies the **80% Rescaling Rule** across the active 6 dimensions ($Score / 0.80$).
@@ -207,18 +220,15 @@ Run verification:
 
 ---
 
-### 2. High-Concurrency Load Test (Locust)
-Simulates **125 concurrent student users** interacting with the backend across authentication, profile retrieval, composite readiness score calculation, historical analytics, job discovery feed, and application tracker against a **Mock LLM** (zero traffic sent to Ollama):
+### 2. High-Concurrency Load Testing (Locust)
 
-```bash
-LLM_PROVIDER=mock OFFLINE_MODE=1 backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --app-dir backend &
-backend/venv/bin/locust -f tests/locustfile.py --headless -u 125 -r 25 --run-time 30s --host http://127.0.0.1:8000 --csv=tests/load_test_results
-```
+The load testing suite (`tests/locustfile.py`) evaluates application capacity under concurrent student traffic against a **Mock LLM** (zero traffic sent to Ollama):
 
-#### Measured Load Test Performance:
-- **Concurrent Users**: **125 concurrent users** (spawn rate 25/s)
-- **Total Requests Handled**: **3,499 requests** in 30 seconds
-- **Throughput (RPS)**: **118.03 req/s** sustained (peaked at 125 req/s)
+#### Scenario A: Read-Only Browsing Traffic (125 Concurrent Users)
+> *Note: These numbers covered read-only endpoints exclusively.*
+- **Concurrent Users**: **125 concurrent users** (spawn rate 25/s over 30s)
+- **Total Requests Handled**: **3,499 requests**
+- **Throughput (RPS)**: **118.03 req/s** sustained
 - **Error Rate**: **0.00%** (0 failures across all 3,499 requests)
 - **Response Times (Aggregated)**:
   - Median (**p50**): **3 ms**
@@ -235,13 +245,33 @@ backend/venv/bin/locust -f tests/locustfile.py --headless -u 125 -r 25 --run-tim
   - `GET /api/tracker/applications`: 346 reqs, 0 failures, p50: **2 ms**, p95: **27 ms**
   - `POST /api/auth/login`: 208 reqs, 0 failures, p50: **15 ms**, p95: **23 ms**
 
+#### Scenario B: Review-Submission & Background Queue Processing (125 Concurrent Users)
+Simulates **125 students concurrently submitting real resume reviews** through the asynchronous job queue (`POST /api/jobs/trigger`) and polling for completion (`GET /api/jobs/status/{id}`), with the Mock LLM configured to sleep **1.0 second** per review and provider concurrency limits enforced (`LLM_CONCURRENCY_MOCK=10`):
+- **Concurrent Users**: **125 concurrent students**
+- **Total Requests Handled**: **9,825 requests** (125 review submissions + 9,700 queue status polls)
+- **Review Submissions Completed**: **125 of 125** (100% completion)
+- **Error Rate**: **0.00%** (0 failures across all 9,825 requests)
+- **Submit Latency (`POST /api/jobs/trigger`)**:
+  - Median (**p50**): **49 ms**
+  - 95th Percentile (**p95**): **94 ms**
+  - Min / Max: **27 ms** / **123 ms**
+- **Queue Wait Time (Time in queue before worker pick-up)**:
+  - Median (**p50**): **11.1 ms**
+  - 95th Percentile (**p95**): **1,233.6 ms** (~1.23 s)
+  - Min / Max: **0.7 ms** / **12,455.3 ms**
+- **Total Review Completion Time (Submit + Queue Wait + 1s LLM Inference)**:
+  - Median (**p50**): **1,019.6 ms** (~1.02 s)
+  - 95th Percentile (**p95**): **2,045.1 ms** (~2.05 s)
+  - Min / Max: **1.9 ms** / **14,809.4 ms**
+
 ---
 
 ### 3. Empirical Token Accounting & API Cost per Student Journey
 
-Measured with `tests/calculate_token_cost.py` directly from empirical token logs recorded in `backend/data/llm_timing.jsonl` across 151 live model execution runs.
+Measured with `tests/calculate_token_cost.py` directly from empirical token logs recorded in `backend/data/llm_timing.jsonl` across live model execution runs.
 
-*(All monetary figures below are estimates based on stated API pricing)*:
+> ⚠️ **UNVERIFIED PLACEHOLDER DISCLAIMER**: All provider pricing rates below are **UNVERIFIED PLACEHOLDERS** loaded from `backend/app/pricing_config.json` for the user to confirm against official billing consoles (`verified: false`, `date_checked: null`). No verification date is claimed or invented.
+> **Prompt Note**: Token counts reflect compact prompts used in our deterministic, code-first pipelines. Hosted prompts or alternative prompt templates with extensive system instructions may be larger.
 
 #### Empirical Token Breakdown:
 - **Active Review Journey** (Interview Disabled behind `ENABLE_MOCK_INTERVIEW`):
@@ -254,14 +284,14 @@ Measured with `tests/calculate_token_cost.py` directly from empirical token logs
   - 5-turn interactive interview + grading: 3,430 prompt / 1,495 completion
   - **Total**: **4,688 prompt tokens** / **1,848 completion tokens** (6,536 tokens total)
 
-#### Estimated Cost per Student by Provider:
-| Provider & Model | Input / 1M | Output / 1M | Active Reviews Cost | Full Journey Cost | Active Students / $1.00 |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Local Ollama (`qwen2.5:3b/7b`)** | **$0.00** | **$0.00** | **$0.00000** | **$0.00000** | **Unlimited ($0.00)** |
-| **Google Gemini 1.5 Flash** *(Rec.)* | $0.075 | $0.30 | **$0.00020** | **$0.00091** | **~5,000 students** |
-| **OpenAI gpt-4o-mini** | $0.15 | $0.60 | **$0.00040** | **$0.00181** | **~2,500 students** |
-| **Anthropic Claude 3.5 Haiku** | $0.80 | $4.00 | **$0.00242** | **$0.01114** | **~410 students** |
-| **OpenAI gpt-4o (Flagship)** | $2.50 | $10.00 | **$0.00668** | **$0.03020** | **~150 students** |
+#### Placeholder Cost per Student by Provider:
+| Provider & Model | Input / 1M | Output / 1M | Active Reviews Cost | Full Journey Cost | Active Students / $1.00 | Placeholder Source URL (To Confirm) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Local Ollama (`qwen2.5:3b/7b`)** | **$0.00** | **$0.00** | **$0.00000** | **$0.00000** | **Unlimited ($0.00)** | Self-hosted weights (Private LAN) |
+| **Google Gemini 1.5 Flash** | $0.075 | $0.30 | **$0.00020** | **$0.00091** | **~5,000 students** | [ai.google.dev/pricing](https://ai.google.dev/pricing) |
+| **OpenAI GPT-4o-mini** | $0.15 | $0.60 | **$0.00040** | **$0.00181** | **~2,500 students** | [openai.com/api/pricing](https://openai.com/api/pricing/) |
+| **Anthropic Claude 3.5 Haiku** | $0.80 | $4.00 | **$0.00242** | **$0.01114** | **~410 students** | [anthropic.com/pricing](https://www.anthropic.com/pricing) |
+| **OpenAI GPT-4o** | $2.50 | $10.00 | **$0.00668** | **$0.03020** | **~150 students** | [openai.com/api/pricing](https://openai.com/api/pricing/) |
 
 ---
 

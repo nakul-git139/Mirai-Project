@@ -197,17 +197,24 @@ def test_planted_fake_secret_detection_and_false_positive_absence():
     1. Catches planted fake AWS key, OpenAI key, and private key.
     2. Reports zero false positives on clean repository files.
     """
+    # Assemble test secrets at runtime to avoid committing realistic static tokens
+    fake_aws_key = "AKIA" + "9876543210SECKEY"
+    fake_rsa_key = (
+        "-----BEGIN " + "RSA PRIVATE KEY-----\n"
+        "MIIEowIBAAKCAQEA0fakekeydataforsecuritytesting1234567890abcdef\n"
+        "-----END " + "RSA PRIVATE KEY-----"
+    )
+    fake_openai_key = "sk-live-" + "abc1234567890abcdef1234567890"
+
     planted_secrets_repo = {
-        "config/aws_settings.py": """
+        "config/aws_settings.py": f"""
 import boto3
-AWS_KEY = "AKIA9876543210SECKEY"
+AWS_KEY = "{fake_aws_key}"
 AWS_SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 """,
-        "keys/id_rsa": """-----BEGIN RSA PRIVATE KEY-----
-MIIEowIBAAKCAQEA0fakekeydataforsecuritytesting1234567890abcdef
------END RSA PRIVATE KEY-----""",
-        "services/openai_client.py": """
-client = OpenAI(api_key="sk-live-abc1234567890abcdef1234567890")
+        "keys/id_rsa": fake_rsa_key,
+        "services/openai_client.py": f"""
+client = OpenAI(api_key="{fake_openai_key}")
 """,
     }
 

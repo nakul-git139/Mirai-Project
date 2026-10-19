@@ -285,7 +285,7 @@ def test_failure_paths_and_queue_resilience(test_users):
     job_queue_service.set_concurrency_limit("ollama", 1)
 
     def failing_task(payload: dict) -> dict:
-        raise RuntimeError("Ollama provider (ollama) is currently unreachable at http://10.134.74.254:11434. Network timeout.")
+        raise RuntimeError("Ollama provider (ollama) is currently unreachable at http://<OLLAMA_HOST>:11434. Network timeout.")
 
     def successful_subsequent_task(payload: dict) -> dict:
         return {"status": "recovered_successfully"}
@@ -399,11 +399,11 @@ def test_admin_queue_dashboard_authorization(client: TestClient, test_users):
 def test_live_remote_ollama_five_concurrent_reviews():
     """
     Verification Requirement 3:
-    Submit 5 real resume reviews at once to remote Ollama (qwen2.5:3b at http://10.134.74.60:11434)
+    Submit 5 real resume reviews at once to remote Ollama (qwen2.5:3b at http://<OLLAMA_HOST>:11434)
     and show that they queue and complete one by one with no timeouts or crashes.
     Report the time for each job.
     """
-    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://10.134.74.60:11434")
+    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
     good_resume_path = os.path.join(FIXTURES_DIR, "resume_good.pdf")
     with open(good_resume_path, "rb") as f:
         pdf_bytes = f.read()

@@ -1,7 +1,7 @@
 # Verification Report: Module 12 - Ollama Robustness for Slow CPU Inference
 
 **Date**: 2026-10-19  
-**Target Host**: `http://10.134.74.27:11434`  
+**Target Host**: `http://<OLLAMA_HOST>:11434`  
 **Model Under Test**: `qwen2.5:3b` (and `qwen2.5:7b` pre-installed on remote server)  
 **Measured Remote CPU Throughput**: ~5–10 tokens/sec  
 
@@ -73,7 +73,7 @@ backend/tests/test_ollama_robustness.py::test_job_match_explanation_with_mock PA
 
 ---
 
-### 2.2 Real Remote Ollama Verification (`qwen2.5:3b` at `10.134.74.27:11434`)
+### 2.2 Real Remote Ollama Verification (`qwen2.5:3b` at `<OLLAMA_HOST>:11434`)
 A complete real inference run across all 5 features was executed over the network against the remote CPU server.
 
 #### A. Resume Review Execution
@@ -215,7 +215,7 @@ dist/assets/index-CNOgsV11.js   492.22 kB │ gzip: 122.88 kB
 | Latency & token audit logger (SQLite + JSONL) | **PASSED** | Verified via `test_timing_logger_records_to_db_and_file` and `/api/settings/timing-logs` |
 | Configurable URL and model via env/settings | **PASSED** | Verified in `test_ollama_base_url_and_model_configurable_via_env` |
 | Frontend animated progress indicator with elapsed timer | **PASSED** | Built component `OllamaProgressIndicator.jsx`; bundled cleanly in `npm run build` |
-| Real Remote Ollama inference (`10.134.74.27:11434`) | **PASSED** | Resume (4.26s), LinkedIn (18.13s), GitHub (7.58s) completed successfully |
+| Real Remote Ollama inference (`<OLLAMA_HOST>:11434`) | **PASSED** | Resume (4.26s), LinkedIn (18.13s), GitHub (7.58s) completed successfully |
 | 3x Consistency scoring (Rule 2) | **PASSED** | Scores `[90, 90, 90]` (0 point variance, well within ±3) |
 | Local install / pull restraint | **PASSED** | Zero `ollama pull` or `ollama serve` commands executed |
 
@@ -329,7 +329,7 @@ make test-live
 ```
 **Real Output**:
 ```
-Running live remote Ollama tests with pytest against http://10.134.74.27:11434...
+Running live remote Ollama tests with pytest against http://<OLLAMA_HOST>:11434...
 backend/venv/bin/pytest -m live -v -o addopts=""
 ============================= test session starts ==============================
 platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3
@@ -346,7 +346,7 @@ backend/tests/test_ollama_robustness.py::test_live_remote_ollama_structured_json
 
 ========== 3 passed, 123 deselected, 5 warnings in 264.60s (0:04:24) ===========
 ```
-- Real remote Ollama server (`http://10.134.74.27:11434`, model `qwen2.5:3b`) evaluated 9 interview answers (3 strong, 3 weak, 3 off-topic), connectivity ping, and structured JSON output with 0 errors.
+- Real remote Ollama server (`http://<OLLAMA_HOST>:11434`, model `qwen2.5:3b`) evaluated 9 interview answers (3 strong, 3 weak, 3 off-topic), connectivity ping, and structured JSON output with 0 errors.
 
 #### 3. Real Spell Checker (`pyspellchecker`) and Grammar Limitation Audit
 ```bash

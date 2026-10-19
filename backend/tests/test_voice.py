@@ -21,10 +21,15 @@ def enable_interview_flag(monkeypatch):
     monkeypatch.setattr("app.config.ENABLE_MOCK_INTERVIEW", True)
 
 
+FIXTURES_AUDIO_DIR = os.path.join(os.path.dirname(__file__), "fixtures", "audio")
+
+
 def _generate_test_speech_audio(text: str, filename: str) -> str:
-    """Generates a real 16kHz WAV audio file with spoken speech using macOS say tool."""
-    os.makedirs("backend/data", exist_ok=True)
-    wav_path = os.path.join("backend/data", filename)
+    """Generates or locates a test 16kHz WAV audio file with spoken speech in fixtures/audio."""
+    os.makedirs(FIXTURES_AUDIO_DIR, exist_ok=True)
+    wav_path = os.path.join(FIXTURES_AUDIO_DIR, filename)
+    if os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
+        return wav_path
     try:
         subprocess.run(
             [
@@ -38,7 +43,7 @@ def _generate_test_speech_audio(text: str, filename: str) -> str:
             check=True,
             capture_output=True,
         )
-    except Exception as e:
+    except Exception:
         # Fallback to wave generator if say is unavailable
         with wave.open(wav_path, "wb") as wf:
             wf.setnchannels(1)
@@ -67,12 +72,12 @@ def test_voice_service_transcription_accuracy():
     Asserts accuracy >= 90%.
     """
     test_sentence = "I have built distributed systems with Python and React for three years."
-    wav_path = _generate_test_speech_audio(test_sentence, "test_spoken_sentence.wav")
+    wav_path = _generate_test_speech_audio(test_sentence, "speech_sample.wav")
 
     with open(wav_path, "rb") as f:
         audio_bytes = f.read()
 
-    transcription = transcribe_audio_bytes(audio_bytes, filename="test_spoken_sentence.wav")
+    transcription = transcribe_audio_bytes(audio_bytes, filename="speech_sample.wav")
     print(f"\n[STT Test] Reference: '{test_sentence}'")
     print(f"[STT Test] Transcribed: '{transcription}'")
 
@@ -91,13 +96,13 @@ def test_transcribe_api_endpoint(client: TestClient, student_user: User, student
       - Rejects empty audio files with HTTP 400.
     """
     test_sentence = "I have built distributed systems with Python and React for three years."
-    wav_path = _generate_test_speech_audio(test_sentence, "test_api_speech.wav")
+    wav_path = _generate_test_speech_audio(test_sentence, "speech_sample.wav")
 
     with open(wav_path, "rb") as f:
         audio_bytes = f.read()
 
     # 1. Successful transcription
-    files = {"file": ("test_api_speech.wav", audio_bytes, "audio/wav")}
+    files = {"file": ("speech_sample.wav", audio_bytes, "audio/wav")}
     resp = client.post("/api/interview/transcribe", files=files, headers=student_auth_headers)
     assert resp.status_code == 200
     data = resp.json()
@@ -149,12 +154,12 @@ def test_voice_message_interview_flow(
 
     # Synthesize spoken response
     answer_sentence = "I have built distributed systems with Python and React for three years."
-    wav_path = _generate_test_speech_audio(answer_sentence, "student_answer_speech.wav")
+    wav_path = _generate_test_speech_audio(answer_sentence, "speech_sample.wav")
     with open(wav_path, "rb") as f:
         audio_bytes = f.read()
 
     # Submit voice message
-    files = {"file": ("student_answer.wav", audio_bytes, "audio/wav")}
+    files = {"file": ("speech_sample.wav", audio_bytes, "audio/wav")}
     msg_resp = client.post(
         f"/api/interview/{session_id}/voice-message",
         files=files,

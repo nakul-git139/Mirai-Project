@@ -1,0 +1,57 @@
+[
+  {
+    "provider": "ollama",
+    "model": "qwen2.5:3b / 7b",
+    "display_name": "Local Ollama (qwen2.5:3b / 7b)",
+    "input_price_per_1m": 0.0,
+    "output_price_per_1m": 0.0,
+    "source_url": "Self-hosted weights (Private LAN)",
+    "date_checked": null,
+    "verified": false,
+    "notes": "Local offline model, zero external API cost (unverified placeholder for user confirmation)"
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-1.5-flash",
+    "display_name": "Google Gemini 1.5 Flash",
+    "input_price_per_1m": 0.075,
+    "output_price_per_1m": 0.30,
+    "source_url": "https://ai.google.dev/pricing",
+    "date_checked": null,
+    "verified": false,
+    "notes": "Unverified placeholder for user confirmation"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "display_name": "OpenAI GPT-4o-mini",
+    "input_price_per_1m": 0.15,
+    "output_price_per_1m": 0.60,
+    "source_url": "https://openai.com/api/pricing/",
+    "date_checked": null,
+    "verified": false,
+    "notes": "Unverified placeholder for user confirmation"
+  },
+  {
+    "provider": "claude",
+    "model": "claude-3-5-haiku-20241022",
+    "display_name": "Anthropic Claude 3.5 Haiku",
+    "input_price_per_1m": 0.80,
+    "output_price_per_1m": 4.00,
+    "source_url": "https://www.anthropic.com/pricing",
+    "date_checked": null,
+    "verified": false,
+    "notes": "Unverified placeholder for user confirmation"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "display_name": "OpenAI GPT-4o",
+    "input_price_per_1m": 2.50,
+    "output_price_per_1m": 10.00,
+    "source_url": "https://openai.com/api/pricing/",
+    "date_checked": null,
+    "verified": false,
+    "notes": "Unverified placeholder for user confirmation"
+  }
+]

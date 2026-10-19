@@ -8,7 +8,7 @@ import { Clock, Cpu, CheckCircle2, RotateCw, AlertCircle } from 'lucide-react';
  */
 export default function OllamaProgressIndicator({
   featureName = "Resume Benchmark Review",
-  host = "http://10.134.74.60:11434",
+  host = "http://<OLLAMA_HOST>:11434",
   model = "qwen2.5:3b",
 }) {
   const [elapsed, setElapsed] = useState(0);
