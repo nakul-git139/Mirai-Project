@@ -11,6 +11,7 @@ import JobDiscoveryPage from './pages/JobDiscoveryPage';
 import ApplicationTrackerPage from './pages/ApplicationTrackerPage';
 import AdminJobBoardPage from './pages/AdminJobBoardPage';
 import { api, getStoredUser, clearAuth } from './api';
+import { JobProvider } from './context/JobContext';
 
 
 export default function App() {
@@ -50,76 +51,78 @@ export default function App() {
   const enableMockInterview = settings?.enable_mock_interview ?? false;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-900 text-slate-100 font-sans">
-      {/* Sidebar Navigation */}
-      <Sidebar
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        onOpenAuth={() => setIsAuthOpen(true)}
-        enableMockInterview={enableMockInterview}
-      />
+    <JobProvider>
+      <div className="flex h-screen w-screen overflow-hidden bg-slate-900 text-slate-100 font-sans">
+        {/* Sidebar Navigation */}
+        <Sidebar
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onOpenAuth={() => setIsAuthOpen(true)}
+          enableMockInterview={enableMockInterview}
+        />
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
-        {activeTab === 'chat' && (
-          <ChatShell currentUser={currentUser} settings={settings} />
-        )}
+        {/* Main Content Area */}
+        <main className="flex-1 flex flex-col h-full overflow-hidden">
+          {activeTab === 'chat' && (
+            <ChatShell currentUser={currentUser} settings={settings} />
+          )}
 
-        {activeTab === 'profile' && (
-          <ProfilePage currentUser={currentUser} onLogout={handleLogout} />
-        )}
+          {activeTab === 'profile' && (
+            <ProfilePage currentUser={currentUser} onLogout={handleLogout} />
+          )}
 
-        {activeTab === 'reviews' && (
-          <ResumeReviewPage
-            currentUser={currentUser}
-            onNavigateToProfile={() => setActiveTab('profile')}
-          />
-        )}
+          {activeTab === 'reviews' && (
+            <ResumeReviewPage
+              currentUser={currentUser}
+              onNavigateToProfile={() => setActiveTab('profile')}
+            />
+          )}
 
-        {activeTab === 'interview' && enableMockInterview && (
-          <MockInterviewPage
-            currentUser={currentUser}
-            onNavigateTab={setActiveTab}
-          />
-        )}
+          {activeTab === 'interview' && enableMockInterview && (
+            <MockInterviewPage
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          )}
 
-        {activeTab === 'score' && (
-          <ReadinessScorePage
-            currentUser={currentUser}
-            onNavigateTab={setActiveTab}
-            enableMockInterview={enableMockInterview}
-          />
-        )}
+          {activeTab === 'score' && (
+            <ReadinessScorePage
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              enableMockInterview={enableMockInterview}
+            />
+          )}
 
-        {activeTab === 'jobs' && (
-          <JobDiscoveryPage
-            currentUser={currentUser}
-            onNavigateTab={setActiveTab}
-          />
-        )}
+          {activeTab === 'jobs' && (
+            <JobDiscoveryPage
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          )}
 
-        {activeTab === 'tracker' && <ApplicationTrackerPage currentUser={currentUser} />}
+          {activeTab === 'tracker' && <ApplicationTrackerPage currentUser={currentUser} />}
 
-        {activeTab === 'settings' && (
-          <SettingsPage
-            onSettingsUpdated={(updated) => setSettings(updated)}
-          />
-        )}
+          {activeTab === 'settings' && (
+            <SettingsPage
+              onSettingsUpdated={(updated) => setSettings(updated)}
+            />
+          )}
 
-        {activeTab === 'admin' && (
-          <AdminJobBoardPage currentUser={currentUser} />
-        )}
+          {activeTab === 'admin' && (
+            <AdminJobBoardPage currentUser={currentUser} />
+          )}
 
-      </main>
+        </main>
 
-      {/* Auth Modal */}
-      <AuthModal
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-        onAuthSuccess={handleAuthSuccess}
-      />
-    </div>
+        {/* Auth Modal */}
+        <AuthModal
+          isOpen={isAuthOpen}
+          onClose={() => setIsAuthOpen(false)}
+          onAuthSuccess={handleAuthSuccess}
+        />
+      </div>
+    </JobProvider>
   );
 }

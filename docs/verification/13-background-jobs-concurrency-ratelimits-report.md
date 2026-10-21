@@ -32,9 +32,9 @@ backend/venv/bin/pytest backend/tests/test_concurrency_and_queue.py -v -m "not l
 ```
 warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
 ============================= test session starts ==============================
-platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3.11
+platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project/backend
+rootdir: backend
 configfile: pytest.ini
 plugins: asyncio-1.4.0, locust-2.46.7, anyio-4.15.1
 asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
@@ -83,9 +83,9 @@ backend/venv/bin/pytest backend/tests/test_concurrency_and_queue.py::test_live_r
 ```
 warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
 ============================= test session starts ==============================
-platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3.11
+platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project/backend
+rootdir: backend
 configfile: pytest.ini
 plugins: asyncio-1.4.0, locust-2.46.7, anyio-4.15.1
 asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
@@ -120,9 +120,9 @@ make test-live
 Running live remote Ollama tests with pytest against http://<OLLAMA_HOST>:11434...
 backend/venv/bin/pytest -m live -v -o addopts=""
 ============================= test session starts ==============================
-platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3.11
+platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project
+rootdir: .
 configfile: pytest.ini
 testpaths: backend/tests, tests
 plugins: asyncio-1.4.0, locust-2.46.7, anyio-4.15.1
@@ -148,9 +148,9 @@ make test
 Running fast offline backend tests with pytest...
 backend/venv/bin/pytest -v
 ============================= test session starts ==============================
-platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3.11
+platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project
+rootdir: .
 configfile: pytest.ini
 testpaths: backend/tests, tests
 plugins: asyncio-1.4.0, locust-2.46.7, anyio-4.15.1

@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 from app import config
 from app.config import SETTINGS_FILE_PATH
@@ -83,9 +83,33 @@ def save_raw_settings(settings_dict: Dict[str, Any]) -> Dict[str, Any]:
     return settings_dict
 
 
+def check_ollama_connectivity(base_url: str, timeout: float = 1.5) -> Tuple[bool, str]:
+    """
+    Fast fail-check for remote/local Ollama connectivity.
+    Returns (True, "") if reachable, or (False, error_reason) if unreachable.
+    """
+    if not base_url or not base_url.strip():
+        return False, "Ollama base URL is empty. Please configure a valid host in Settings."
+
+    url = base_url.strip().rstrip("/")
+    if "<" in url or ">" in url or "placeholder" in url.lower():
+        return False, f"Ollama base URL contains placeholder '{base_url}'. Please update Settings with a valid host IP."
+
+    import httpx
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.get(f"{url}/api/tags")
+            if resp.status_code == 200:
+                return True, ""
+            return False, f"Ollama returned HTTP {resp.status_code} at {url}."
+    except Exception as e:
+        return False, f"Remote Ollama host at '{url}' is unreachable ({type(e).__name__}). Please verify the Ollama machine is running on your network."
+
+
 def get_public_settings() -> Dict[str, Any]:
     """Return sanitized settings suitable for frontend API responses - strictly ZERO API keys."""
     raw = load_raw_settings()
+    env_provider = os.environ.get("LLM_PROVIDER")
     return {
         "provider": raw.get("provider", "ollama"),
         "model": raw.get("model", "qwen2.5:3b"),
@@ -99,5 +123,6 @@ def get_public_settings() -> Dict[str, Any]:
         "concurrency_limits": raw.get("concurrency_limits", config.DEFAULT_CONCURRENCY_LIMITS),
         "rate_limit_reviews_per_hour": raw.get("rate_limit_reviews_per_hour", config.DEFAULT_RATE_LIMIT_REVIEWS_PER_HOUR),
         "enable_mock_interview": getattr(config, "ENABLE_MOCK_INTERVIEW", False),
+        "env_forced": bool(env_provider),
+        "env_forced_provider": env_provider,
     }
-

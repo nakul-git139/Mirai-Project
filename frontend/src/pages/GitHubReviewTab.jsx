@@ -277,6 +277,10 @@ export default function GitHubReviewTab({ currentUser, onNavigateToProfile }) {
             setActiveJobId(null);
             setRunningReview(false);
           }}
+          onCancel={() => {
+            setActiveJobId(null);
+            setRunningReview(false);
+          }}
         />
       ) : runningReview && (
         <OllamaProgressIndicator featureName="GitHub & Codebase Benchmark Review" />

@@ -44,6 +44,16 @@ A single, unified application with an AI chat interface and career copilot where
 
 ---
 
+## Project Documentation & Submission Artifacts
+
+- 📄 **Design Document (Markdown)**: [docs/design-document.md](docs/design-document.md)
+- 📑 **Design Document (PDF)**: [docs/design-document.pdf](docs/design-document.pdf)
+- 📊 **Test Report & Verification Ledger**: [docs/test-report.md](docs/test-report.md)
+- 🏛️ **System Architecture Specification**: [docs/architecture.md](docs/architecture.md)
+- 📐 **Institutional Placement Benchmarks & Rubrics**: [docs/benchmarks.md](docs/benchmarks.md)
+
+---
+
 ## One-Command Quickstart
 
 ### Prerequisites

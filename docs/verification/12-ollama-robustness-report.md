@@ -52,9 +52,9 @@ PYTHONPATH=backend backend/venv/bin/pytest backend/tests/test_ollama_robustness.
 **Output**:
 ```
 ============================= test session starts ==============================
-platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project/backend
+rootdir: backend
 configfile: pytest.ini
 plugins: anyio-4.12.1, asyncio-1.2.0
 asyncio: mode=auto, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
@@ -232,9 +232,9 @@ make test
 Running all backend tests with pytest...
 backend/venv/bin/pytest -v
 ============================= test session starts ==============================
-platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project
+rootdir: .
 configfile: pytest.ini
 testpaths: backend/tests, tests
 plugins: anyio-4.12.1, asyncio-1.2.0
@@ -309,8 +309,8 @@ make test
 Running fast offline backend tests with pytest...
 backend/venv/bin/pytest -v
 ============================= test session starts ==============================
-platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3
-rootdir: /Users/nakulmirai/Mirai Project
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- backend/venv/bin/python
+rootdir: .
 configfile: pytest.ini
 testpaths: backend/tests, tests
 plugins: anyio-4.12.1, asyncio-1.2.0
@@ -332,8 +332,8 @@ make test-live
 Running live remote Ollama tests with pytest against http://<OLLAMA_HOST>:11434...
 backend/venv/bin/pytest -m live -v -o addopts=""
 ============================= test session starts ==============================
-platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3
-rootdir: /Users/nakulmirai/Mirai Project
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- backend/venv/bin/python
+rootdir: .
 configfile: pytest.ini
 testpaths: backend/tests, tests
 plugins: anyio-4.12.1, asyncio-1.2.0
@@ -409,8 +409,8 @@ backend/venv_py311/bin/pytest -v
 **Real Output**:
 ```
 ============================= test session starts ==============================
-platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- /Users/nakulmirai/Mirai Project/backend/venv_py311/bin/python3.11
-rootdir: /Users/nakulmirai/Mirai Project
+platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- backend/venv_py311/bin/python
+rootdir: .
 configfile: pytest.ini
 testpaths: backend/tests, tests
 plugins: asyncio-1.4.0, locust-2.46.7, anyio-4.15.1
@@ -441,9 +441,9 @@ Installing Playwright chromium browser...
 Running fast offline backend tests with pytest...
 backend/venv/bin/pytest -v
 ============================= test session starts ==============================
-platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3.11
+platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project
+rootdir: .
 configfile: pytest.ini
 testpaths: backend/tests, tests
 plugins: asyncio-1.4.0, locust-2.46.7, anyio-4.15.1
@@ -486,7 +486,7 @@ make test-e2e
 Starting isolated E2E Playwright test runner...
 ==========================================================
  Starting Isolated E2E Playwright Flow
- Temporary Test Database: /Users/nakulmirai/Mirai Project/backend/data/test_e2e.db
+ Temporary Test Database: backend/data/test_e2e.db
 ==========================================================
 Waiting for backend on http://127.0.0.1:8000/api/health...
 Backend is ready.
@@ -494,9 +494,9 @@ Waiting for frontend on http://127.0.0.1:5173...
 Frontend is ready.
 Running Playwright browser flow...
 ============================= test session starts ==============================
-platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3.11
+platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project/backend
+rootdir: backend
 configfile: pytest.ini
 plugins: asyncio-1.4.0, locust-2.46.7, anyio-4.15.1
 asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
@@ -527,7 +527,7 @@ PASSED
 ======================== 1 passed, 5 warnings in 51.93s ========================
 
 Shutting down test servers...
-Isolated test database wiped (/Users/nakulmirai/Mirai Project/backend/data/test_e2e.db*).
+Isolated test database wiped (backend/data/test_e2e.db*).
 ```
 - **Database Pollution Audit**:
   - Queried active dev database `career_copilot.db` for the run's timestamped user `admin_1792396396@msot.ac.in`:

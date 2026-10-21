@@ -5,8 +5,9 @@ import logging
 from typing import List, Dict, Any, Optional, AsyncIterator, Iterator
 import httpx
 
-from app.llm.base import BaseLLMAdapter, LLMMessage, LLMResponse
+from app.llm.base import BaseLLMAdapter, LLMMessage, LLMResponse, JobCancelledError
 from app.services.timing_logger import log_llm_timing
+
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,8 @@ class OllamaAdapter(BaseLLMAdapter):
         return payload
 
     def _handle_error(self, exc: Exception) -> Exception:
+        if isinstance(exc, JobCancelledError):
+            return exc
         if isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout)):
             return RuntimeError(
                 f"Ollama is not running at {self.base_url}. Start it with: 'ollama serve' or verify network connectivity."
@@ -108,6 +111,11 @@ class OllamaAdapter(BaseLLMAdapter):
         format_json: bool = False,
         **kwargs: Any,
     ) -> LLMResponse:
+        from app.services.job_queue import get_current_job_handle
+        handle = get_current_job_handle()
+        if handle and handle.is_cancelled():
+            raise JobCancelledError("Job was cancelled before LLM request.")
+
         feature = kwargs.get("feature", "llm_generation")
         payload = self._prepare_payload(messages, temperature, format_json, **kwargs)
         timeout_config = httpx.Timeout(self.timeout, connect=30.0)
@@ -115,10 +123,18 @@ class OllamaAdapter(BaseLLMAdapter):
         t_start = time.perf_counter()
         try:
             with httpx.Client(timeout=timeout_config) as client:
-                response = client.post(f"{self.base_url}/api/chat", json=payload)
-                response.raise_for_status()
-                data = response.json()
+                if handle:
+                    handle.set_active_client(client)
+                try:
+                    response = client.post(f"{self.base_url}/api/chat", json=payload)
+                    response.raise_for_status()
+                    data = response.json()
+                finally:
+                    if handle:
+                        handle.clear_active_client(client)
         except Exception as e:
+            if handle and handle.is_cancelled():
+                raise JobCancelledError("Job was cancelled during inference.") from e
             t_elapsed = time.perf_counter() - t_start
             log_llm_timing(
                 feature=feature,
@@ -167,6 +183,11 @@ class OllamaAdapter(BaseLLMAdapter):
         format_json: bool = False,
         **kwargs: Any,
     ) -> LLMResponse:
+        from app.services.job_queue import get_current_job_handle
+        handle = get_current_job_handle()
+        if handle and handle.is_cancelled():
+            raise JobCancelledError("Job was cancelled before LLM request.")
+
         feature = kwargs.get("feature", "llm_generation")
         payload = self._prepare_payload(messages, temperature, format_json, **kwargs)
         timeout_config = httpx.Timeout(self.timeout, connect=30.0)
@@ -174,10 +195,18 @@ class OllamaAdapter(BaseLLMAdapter):
         t_start = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=timeout_config) as client:
-                response = await client.post(f"{self.base_url}/api/chat", json=payload)
-                response.raise_for_status()
-                data = response.json()
+                if handle:
+                    handle.set_active_client(client)
+                try:
+                    response = await client.post(f"{self.base_url}/api/chat", json=payload)
+                    response.raise_for_status()
+                    data = response.json()
+                finally:
+                    if handle:
+                        handle.clear_active_client(client)
         except Exception as e:
+            if handle and handle.is_cancelled():
+                raise JobCancelledError("Job was cancelled during inference.") from e
             t_elapsed = time.perf_counter() - t_start
             log_llm_timing(
                 feature=feature,

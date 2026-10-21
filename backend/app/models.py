@@ -234,7 +234,8 @@ class BackgroundJob(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     task_type = Column(String(50), nullable=False, index=True)  # resume_review, linkedin_review, github_review, live_link_check, job_match
     provider = Column(String(50), nullable=False)  # ollama, openai, claude, gemini, mock
-    status = Column(String(50), default="queued", nullable=False, index=True)  # queued, running, done, failed
+    model = Column(String(100), nullable=True)  # e.g. qwen2.5:3b, gpt-4o-mini
+    status = Column(String(50), default="queued", nullable=False, index=True)  # queued, running, done, failed, cancelled
     payload = Column(JSON, default=dict, nullable=False)
     result = Column(JSON, nullable=True)
     error_message = Column(Text, nullable=True)

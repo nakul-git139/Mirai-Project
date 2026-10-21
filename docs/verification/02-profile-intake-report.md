@@ -19,9 +19,9 @@ make test
 Running all backend tests with pytest...
 backend/venv/bin/pytest -v
 ============================= test session starts ==============================
-platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project
+rootdir: .
 configfile: pytest.ini
 testpaths: backend/tests
 plugins: anyio-4.12.1, asyncio-1.2.0
@@ -126,7 +126,7 @@ ALL CURL VERIFICATION STEPS PASSED SUCCESSFULLY!
 - Verified stored resume appeared in the files table under `My Data Privacy & Deletion Center`.
 - Clicked `Clear Profile Data & Uploaded Files`, confirmed modal, and verified disk file removed and table displayed `No files currently saved in storage`.
 - Recording and screenshot saved:
-  `file:///Users/nakulmirai/.gemini/antigravity-ide/brain/29fdb6a9-c8ae-42de-8b5c-d3ea05bfb1f0/profile_flow_verified_1792056968116.webp`
+  `artifacts/verification_flow.webp`
 
 ---
 

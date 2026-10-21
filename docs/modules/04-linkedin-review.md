@@ -2,7 +2,7 @@
 
 ## 1. What the Module Does
 Module 04 implements the **Placement Readiness LinkedIn Reviewer** for MSOT students:
-- **Canonical 5-Point Rubric**: Evaluates student LinkedIn profiles strictly against the placement readiness benchmark specified in [docs/benchmarks.md](file:///Users/nakulmirai/Mirai%20Project/docs/benchmarks.md):
+- **Canonical 5-Point Rubric**: Evaluates student LinkedIn profiles strictly against the placement readiness benchmark specified in [docs/benchmarks.md](../benchmarks.md):
   1. Professional profile photo present (`CHK-LI-PHOTO`, 10 pts)
   2. Headline present, specific, and within LinkedIn's 220-character limit (`CHK-LI-HEADLINE`, 20 pts)
   3. About section present and substantive with >= 150 characters and >= 30 words (`CHK-LI-ABOUT`, 20 pts)
@@ -38,15 +38,15 @@ graph TD
 
 ### A. Review Trigger Flow
 1. **Student Request**:
-   - The student navigates to the **Benchmark Reviews** tab, clicks the **LinkedIn** sub-tab in [ResumeReviewPage.jsx](file:///Users/nakulmirai/Mirai%20Project/frontend/src/pages/ResumeReviewPage.jsx), and chooses either **Upload PDF Export** or **Paste Profile Text** in [LinkedInReviewTab.jsx](file:///Users/nakulmirai/Mirai%20Project/frontend/src/pages/LinkedInReviewTab.jsx).
+   - The student navigates to the **Benchmark Reviews** tab, clicks the **LinkedIn** sub-tab in [ResumeReviewPage.jsx](../../frontend/src/pages/ResumeReviewPage.jsx), and chooses either **Upload PDF Export** or **Paste Profile Text** in [LinkedInReviewTab.jsx](../../frontend/src/pages/LinkedInReviewTab.jsx).
    - Calling `api.triggerLinkedInReviewPdf(file)` sends a multipart form request to `POST /api/reviews/linkedin`.
    - Calling `api.triggerLinkedInReviewText(text)` sends JSON `{ text }` to `POST /api/reviews/linkedin/paste`.
 2. **Consent & Verification Context**:
-   - In [linkedin_review.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/routers/linkedin_review.py), endpoints verify that `profile.consent_given == True`.
+   - In [linkedin_review.py](../../backend/app/routers/linkedin_review.py), endpoints verify that `profile.consent_given == True`.
    - `get_student_resume_context()` retrieves the candidate's verified resume data from `profile.parsed_resume` or parses their latest stored resume file.
 
 ### B. Benchmark Evaluation Engine
-In [linkedin_reviewer.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/linkedin_reviewer.py), `review_linkedin` executes all 5 checks:
+In [linkedin_reviewer.py](../../backend/app/services/linkedin_reviewer.py), `review_linkedin` executes all 5 checks:
 1. `evaluate_profile_photo(doc, raw_text, source)`:
    - For PDF export, `detect_pdf_profile_photo` inspects embedded image objects on page 1 within the top 40% header region with avatar dimensions and aspect ratio.
    - For pasted text, scans for profile photo presence indicators.
@@ -72,7 +72,7 @@ In [linkedin_reviewer.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/s
 1. **Persistence**:
    - Saves record to SQLite table `review_results` with `review_type = "linkedin"`, `score`, `summary`, `checks`, and `rewrites`.
 2. **UI Presentation**:
-   - [LinkedInReviewTab.jsx](file:///Users/nakulmirai/Mirai%20Project/frontend/src/pages/LinkedInReviewTab.jsx) displays the 0–100 score gauge, tier badge, breakdown cards, and "Ready-to-Paste Profile Rewrites" with clipboard copy functionality.
+   - [LinkedInReviewTab.jsx](../../frontend/src/pages/LinkedInReviewTab.jsx) displays the 0–100 score gauge, tier badge, breakdown cards, and "Ready-to-Paste Profile Rewrites" with clipboard copy functionality.
 
 ---
 

@@ -1,4 +1,4 @@
-# Python
+# Python & Caches
 __pycache__/
 *.py[cod]
 *$py.class
@@ -9,22 +9,34 @@ backend/venv_py311/
 .pytest_cache/
 **/.pytest_cache/
 
-# Node
+# Node & Build Outputs
 node_modules/
 frontend/node_modules/
 frontend/dist/
 dist/
 
-# Local databases & uploads & local settings
+# Local Databases, Uploads, Runtime Settings & Data
 backend/data/
 
-backend/data/screenshots/*
-!backend/data/screenshots/.gitkeep
+# Testing Outputs & Logs
 tests/load_test_results*
-.DS_Store
-*.log
 scratch/
+*.log
+*.jsonl
+
+# Environment & Secrets
 .env
 *.env
 backend/.env
 
+# OS & IDE Metadata
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Untracked Unused Assets
+frontend/src/assets/hero.png
+frontend/src/assets/react.svg
+frontend/src/assets/vite.svg

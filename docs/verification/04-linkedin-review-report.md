@@ -15,9 +15,9 @@ backend/venv/bin/pytest -v -s backend/tests/test_linkedin_review.py
 **Output**:
 ```text
 ============================= test session starts ==============================
-platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project/backend
+rootdir: backend
 configfile: pytest.ini
 plugins: anyio-4.12.1, asyncio-1.2.0
 asyncio: mode=auto, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
@@ -46,9 +46,9 @@ backend/venv/bin/pytest -v
 **Output**:
 ```text
 ============================= test session starts ==============================
-platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project
+rootdir: .
 configfile: pytest.ini
 testpaths: backend/tests
 plugins: anyio-4.12.1, asyncio-1.2.0

@@ -32,6 +32,12 @@ class LLMProviderTimeoutError(LLMProviderError):
     pass
 
 
+class JobCancelledError(LLMProviderError):
+    """Raised when in-flight job inference is cancelled by user or admin."""
+    pass
+
+
+
 class BaseLLMAdapter(ABC):
     """Abstract interface for all LLM provider adapters."""
 

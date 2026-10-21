@@ -11,6 +11,8 @@ from app.schemas import (
     BackgroundJobTriggerRequest,
     BackgroundJobResponse,
     AdminQueueStatusResponse,
+    CancelJobResponse,
+    CancelAllJobsResponse,
 )
 from app.services.job_queue import job_queue_service, RateLimitExceededError
 from app.services.job_dispatchers import DISPATCH_MAP
@@ -63,6 +65,11 @@ def trigger_background_job(
             },
             headers={"Retry-After": str(rle.retry_after)},
         )
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(ve),
+        )
 
     # Dispatch to asynchronous worker
     task_fn = DISPATCH_MAP[task_type]
@@ -75,6 +82,7 @@ def trigger_background_job(
         user_id=job.user_id,
         task_type=job.task_type,
         provider=job.provider,
+        model=job.model,
         status=job.status,
         queue_position=pos,
         result=job.result,
@@ -117,6 +125,7 @@ def get_job_status(
         user_id=job.user_id,
         task_type=job.task_type,
         provider=job.provider,
+        model=job.model,
         status=job.status,
         queue_position=pos,
         result=job.result,
@@ -157,6 +166,7 @@ def get_my_active_jobs(
                 user_id=j.user_id,
                 task_type=j.task_type,
                 provider=j.provider,
+                model=j.model,
                 status=j.status,
                 queue_position=pos,
                 result=j.result,
@@ -180,3 +190,69 @@ def get_admin_queue_dashboard(
     """
     data = job_queue_service.get_admin_queue_status(db)
     return AdminQueueStatusResponse(**data)
+
+
+@router.post("/{job_id}/cancel", response_model=BackgroundJobResponse)
+@router.post("/cancel/{job_id}", response_model=BackgroundJobResponse)
+def cancel_job_endpoint(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Cancel an active or queued background job.
+    A student can cancel only their own jobs (HTTP 403 otherwise).
+    Admins can cancel any job from the admin queue view.
+    Immediate slot release and in-flight HTTP request abort.
+    """
+    try:
+        job = job_queue_service.cancel_job(
+            job_id=job_id,
+            user_id=current_user.id,
+            is_admin=(current_user.role == "admin"),
+            reason=f"Cancelled by {current_user.role}",
+        )
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(ve),
+        )
+    except PermissionError as pe:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(pe),
+        )
+
+    pos = None
+    if job.status == "queued":
+        pos = job_queue_service.calculate_queue_position(job.id, job.provider, db)
+
+    return BackgroundJobResponse(
+        id=job.id,
+        user_id=job.user_id,
+        task_type=job.task_type,
+        provider=job.provider,
+        status=job.status,
+        queue_position=pos,
+        result=job.result,
+        error_message=job.error_message,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+    )
+
+
+@router.post("/my/cancel-all", response_model=CancelAllJobsResponse)
+def cancel_all_my_jobs(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Cancel all queued or running jobs for the authenticated student.
+    """
+    cancelled_ids = job_queue_service.cancel_all_student_jobs(user_id=current_user.id)
+    return CancelAllJobsResponse(
+        cancelled_count=len(cancelled_ids),
+        cancelled_job_ids=cancelled_ids,
+        message=f"Successfully cancelled {len(cancelled_ids)} active jobs.",
+    )
+

@@ -2,7 +2,7 @@
 
 ## 1. What the Module Does
 Module 03 implements the **Placement Readiness Benchmark Resume Reviewer** for MSOT students:
-- **Canonical 8-Point Rubric**: Evaluates resumes strictly against the placement benchmark specified in [docs/benchmarks.md](file:///Users/nakulmirai/Mirai%20Project/docs/benchmarks.md).
+- **Canonical 8-Point Rubric**: Evaluates resumes strictly against the placement benchmark specified in [docs/benchmarks.md](../benchmarks.md).
   1. Exactly one page format (`CHK-PAGE-COUNT`, 15 pts)
   2. Clean visual layout, typography, margin alignment, and uniform dates (`CHK-VISUAL-LAYOUT`, 10 pts)
   3. Zero spelling or grammar mistakes (`CHK-SPELL-GRAMMAR`, 10 pts)
@@ -23,13 +23,13 @@ Module 03 implements the **Placement Readiness Benchmark Resume Reviewer** for M
 ### A. Review Trigger Flow
 1. **Student Request**:
    - The student visits the **Resume Reviews** tab (`ResumeReviewPage.jsx`) or clicks **Re-run Review** / **Upload New Resume**.
-   - Frontend calls `api.triggerResumeReview(file)` in [api.js](file:///Users/nakulmirai/Mirai%20Project/frontend/src/api.js).
+   - Frontend calls `api.triggerResumeReview(file)` in [api.js](../../frontend/src/api.js).
 2. **Consent & File Resolution**:
-   - In [resume_review.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/routers/resume_review.py), `trigger_resume_review` validates that `profile.consent_given == True`. If not, raises clean HTTP 400 Bad Request.
+   - In [resume_review.py](../../backend/app/routers/resume_review.py), `trigger_resume_review` validates that `profile.consent_given == True`. If not, raises clean HTTP 400 Bad Request.
    - If a file is uploaded, reads the uploaded bytes; otherwise, reads the student's latest stored resume from `UploadedFile` on disk.
 
 ### B. Benchmark Evaluation Pipeline
-In [resume_reviewer.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/resume_reviewer.py), `review_resume` executes all 8 benchmark checks:
+In [resume_reviewer.py](../../backend/app/services/resume_reviewer.py), `review_resume` executes all 8 benchmark checks:
 1. `evaluate_page_count(page_count, word_count)`:
    - Uses PyMuPDF `len(doc)` for PDF or estimated page count for DOCX.
    - Passes if `page_count == 1`.
@@ -57,7 +57,7 @@ In [resume_reviewer.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/ser
 2. **Database Persistence**:
    - Saves record to SQLite `review_results` table via SQLAlchemy `ReviewResult` model.
 3. **UI Rendering**:
-   - [ResumeReviewPage.jsx](file:///Users/nakulmirai/Mirai%20Project/frontend/src/pages/ResumeReviewPage.jsx) renders score ring, summary, filter pills (`All`, `Needs Fix`, `Passed`), checklist cards with observed evidence and specific fixes, and visual document preview.
+   - [ResumeReviewPage.jsx](../../frontend/src/pages/ResumeReviewPage.jsx) renders score ring, summary, filter pills (`All`, `Needs Fix`, `Passed`), checklist cards with observed evidence and specific fixes, and visual document preview.
 
 ---
 

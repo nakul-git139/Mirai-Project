@@ -38,9 +38,9 @@ make test
 ```
 cd backend && venv/bin/pytest -v
 ============================= test session starts ==============================
-platform darwin -- Python 3.11.14, pytest-8.3.4, pluggy-1.5.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python
+platform darwin -- Python 3.11.14, pytest-8.3.4, pluggy-1.5.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project/backend
+rootdir: backend
 configfile: pytest.ini
 plugins: anyio-4.8.0, asyncio-0.25.2
 asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop=None

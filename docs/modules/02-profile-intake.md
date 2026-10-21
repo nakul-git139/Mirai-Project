@@ -15,18 +15,18 @@ Module 02 implements the **Profile Intake & Privacy Pipeline** for MSOT students
 
 ### A. Consent Enforcement Flow
 1. **Consent Verification**:
-   - In [profile.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/routers/profile.py), any endpoint mutating profile data (`PUT /api/profile/me`, `POST /api/profile/resume`, `POST /api/profile/linkedin/upload`, `POST /api/profile/linkedin/paste`, `POST /api/profile/chat-intake`) calls `get_or_create_profile(current_user, db)`.
+   - In [profile.py](../../backend/app/routers/profile.py), any endpoint mutating profile data (`PUT /api/profile/me`, `POST /api/profile/resume`, `POST /api/profile/linkedin/upload`, `POST /api/profile/linkedin/paste`, `POST /api/profile/chat-intake`) calls `get_or_create_profile(current_user, db)`.
    - If `not profile.consent_given`, it immediately raises `HTTPException(status_code=400, detail="Consent is required before submitting or updating profile data. Please grant consent first.")`.
 2. **Consent State Management**:
-   - `POST /api/profile/consent` accepts `{ consent_given: bool }` via `ConsentUpdate` in [schemas.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/schemas.py).
+   - `POST /api/profile/consent` accepts `{ consent_given: bool }` via `ConsentUpdate` in [schemas.py](../../backend/app/schemas.py).
    - It updates `profile.consent_given` and records `profile.consent_date = datetime.utcnow()`.
 
 ### B. Resume Extraction Flow (PDF & DOCX)
 1. **Upload & Format Dispatch**:
-   - `upload_resume(file, current_user, db)` in [profile.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/routers/profile.py) verifies file extension (`.pdf`, `.docx`, `.doc`).
-   - If corrupt, malformed, or empty, [profile_parser.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/profile_parser.py) raises a clean `ValueError`, which the router translates into an HTTP 400 with actionable feedback (preventing 500 errors).
+   - `upload_resume(file, current_user, db)` in [profile.py](../../backend/app/routers/profile.py) verifies file extension (`.pdf`, `.docx`, `.doc`).
+   - If corrupt, malformed, or empty, [profile_parser.py](../../backend/app/services/profile_parser.py) raises a clean `ValueError`, which the router translates into an HTTP 400 with actionable feedback (preventing 500 errors).
 2. **PyMuPDF PDF Parsing**:
-   - `extract_text_and_links_from_pdf(file_bytes)` in [profile_parser.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/profile_parser.py) loads the document into `fitz.open(stream=file_bytes, filetype="pdf")`.
+   - `extract_text_and_links_from_pdf(file_bytes)` in [profile_parser.py](../../backend/app/services/profile_parser.py) loads the document into `fitz.open(stream=file_bytes, filetype="pdf")`.
    - `page_count` is determined by `len(doc)`.
    - Embedded hyperlinks are parsed from `page.get_links()`, supplemented by regex detection of plain-text URLs.
 3. **python-docx Parsing**:
@@ -37,19 +37,19 @@ Module 02 implements the **Profile Intake & Privacy Pipeline** for MSOT students
    - `extract_projects_from_text(text, links)` identifies individual projects, correlating them with GitHub and live URLs.
 5. **Disk Persistence**:
    - Saves file bytes to `backend/data/uploads/<user_id>_<timestamp>_<filename>`.
-   - Records file metadata in SQLite via the `UploadedFile` model in [models.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/models.py).
+   - Records file metadata in SQLite via the `UploadedFile` model in [models.py](../../backend/app/models.py).
 
 ### C. LinkedIn & Chat Intake Flow
 1. **LinkedIn Parsing**:
    - `parse_linkedin_text(text)` extracts headline, about summary, experience blocks, and skills.
    - `parse_linkedin_pdf(file_bytes)` parses LinkedIn official PDF exports.
 2. **Chat Intake Extraction**:
-   - `extract_profile_data_from_chat_text(message)` in [profile_parser.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/profile_parser.py) identifies GitHub usernames/URLs, LeetCode handles, and project links from chat prompts.
-   - [ChatShell.jsx](file:///Users/nakulmirai/Mirai%20Project/frontend/src/components/ChatShell.jsx) hooks into this to sync handles shared during conversation.
+   - `extract_profile_data_from_chat_text(message)` in [profile_parser.py](../../backend/app/services/profile_parser.py) identifies GitHub usernames/URLs, LeetCode handles, and project links from chat prompts.
+   - [ChatShell.jsx](../../frontend/src/components/ChatShell.jsx) hooks into this to sync handles shared during conversation.
 
 ### D. "My Data" Transparency & Deletion Flow
 1. **Data Inspection**:
-   - `GET /api/profile/me` returns the full `ProfileResponse` in [schemas.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/schemas.py), including parsed resume sections, skills, and tracked files.
+   - `GET /api/profile/me` returns the full `ProfileResponse` in [schemas.py](../../backend/app/schemas.py), including parsed resume sections, skills, and tracked files.
 2. **Profile Data Reset**:
    - `DELETE /api/profile/data` finds all `UploadedFile` records for the user and physically unlinks each file from `backend/data/uploads/` via `os.remove`. It also clears all parsed resume data, LinkedIn data, projects, achievements, and skills from the database.
 3. **Permanent Account Deletion**:

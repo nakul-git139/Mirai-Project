@@ -4,6 +4,7 @@ import time
 import asyncio
 import random
 import logging
+import httpx
 from app.llm.base import (
     BaseLLMAdapter,
     LLMMessage,
@@ -11,7 +12,9 @@ from app.llm.base import (
     LLMProviderRateLimitError,
     LLMProviderTimeoutError,
     LLMProviderError,
+    JobCancelledError,
 )
+
 
 logger = logging.getLogger(__name__)
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
@@ -83,16 +86,31 @@ class OpenAIAdapter(BaseLLMAdapter):
     ) -> LLMResponse:
         req = self._prepare_request(messages, temperature, format_json)
         attempt = 0
+        from app.services.job_queue import get_current_job_handle
+        handle = get_current_job_handle()
 
         while True:
+            if handle and handle.is_cancelled():
+                raise JobCancelledError("Job was cancelled before OpenAI request.")
+
             try:
                 with httpx.Client(timeout=self.timeout) as client:
-                    response = client.post(f"{self.base_url}/chat/completions", **req)
+                    if handle:
+                        handle.set_active_client(client)
+                    try:
+                        response = client.post(f"{self.base_url}/chat/completions", **req)
+                    finally:
+                        if handle:
+                            handle.clear_active_client(client)
+
                     if response.status_code == 429:
                         if attempt < self.max_retries:
                             delay = self._calculate_backoff(attempt, response)
                             logger.warning(f"OpenAI 429 Rate Limit (attempt {attempt+1}/{self.max_retries}). Backing off for {delay:.2f}s...")
-                            time.sleep(delay)
+                            if handle and handle.wait_or_cancelled(delay):
+                                raise JobCancelledError("Job was cancelled during rate limit backoff.")
+                            elif not handle:
+                                time.sleep(delay)
                             attempt += 1
                             continue
                         raise LLMProviderRateLimitError(
@@ -109,18 +127,25 @@ class OpenAIAdapter(BaseLLMAdapter):
                         usage=data.get("usage"),
                     )
             except httpx.TimeoutException as exc:
+                if handle and handle.is_cancelled():
+                    raise JobCancelledError("Job was cancelled during timeout.") from exc
                 if attempt < self.max_retries:
                     delay = self._calculate_backoff(attempt)
                     logger.warning(f"OpenAI request timeout (attempt {attempt+1}/{self.max_retries}). Backing off for {delay:.2f}s...")
-                    time.sleep(delay)
+                    if handle and handle.wait_or_cancelled(delay):
+                        raise JobCancelledError("Job was cancelled during timeout backoff.")
+                    elif not handle:
+                        time.sleep(delay)
                     attempt += 1
                     continue
                 raise LLMProviderTimeoutError(
                     f"Hosted provider (OpenAI) request timed out after {self.timeout}s ({attempt} retries)."
                 ) from exc
-            except (LLMProviderRateLimitError, LLMProviderTimeoutError, ValueError):
+            except (JobCancelledError, LLMProviderRateLimitError, LLMProviderTimeoutError, ValueError):
                 raise
             except Exception as exc:
+                if handle and handle.is_cancelled():
+                    raise JobCancelledError("Job was cancelled during API call.") from exc
                 raise LLMProviderError(f"OpenAI API call failed: {exc}") from exc
 
     async def agenerate(

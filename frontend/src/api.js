@@ -349,6 +349,8 @@ export const api = {
     }),
   getJobStatus: (jobId) => fetchApi(`/api/jobs/status/${jobId}`),
   getMyActiveJobs: () => fetchApi("/api/jobs/my/active"),
+  cancelJob: (jobId) => fetchApi(`/api/jobs/${jobId}/cancel`, { method: "POST" }),
+  cancelAllMyJobs: () => fetchApi("/api/jobs/my/cancel-all", { method: "POST" }),
   getAdminQueueStatus: () => fetchApi("/api/admin/llm-queue"),
 
   triggerResumeReviewAsync: (file = null, provider = null) => {

@@ -57,11 +57,13 @@ def run_resume_review(payload: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError("No resume content found to review.")
 
         provider = payload.get("provider")
+        model = payload.get("model")
         adapter = None
         if provider:
             try:
-                adapter = get_llm_adapter(provider=provider)
-            except Exception:
+                adapter = get_llm_adapter(provider=provider, model=model)
+            except Exception as e:
+                logger.warning(f"Could not initialize adapter for provider={provider}, model={model}: {e}")
                 adapter = None
 
         review_data = review_resume(
@@ -70,6 +72,10 @@ def run_resume_review(payload: Dict[str, Any]) -> Dict[str, Any]:
             profile_data=profile_context,
             adapter=adapter,
         )
+
+        model_name = getattr(adapter, "model", model or "unknown") if adapter else (model or "unknown")
+        reviewed_with = f"{provider} / {model_name}" if provider else "code-only"
+        code_only_checks = [1, 2, 3, 4, 5, 6, 7, 8]
 
         if adapter is not None:
             try:
@@ -99,6 +105,7 @@ def run_resume_review(payload: Dict[str, Any]) -> Dict[str, Any]:
             score=review_data["score"],
             summary=review_data["summary"],
             checks=review_data["checks"],
+            rewrites={"reviewed_with": reviewed_with, "code_only_checks": code_only_checks},
             created_at=datetime.utcnow(),
         )
         db.add(review_record)
@@ -117,6 +124,8 @@ def run_resume_review(payload: Dict[str, Any]) -> Dict[str, Any]:
             "score": review_record.score,
             "summary": review_record.summary,
             "checks": review_record.checks,
+            "reviewed_with": reviewed_with,
+            "code_only_checks": code_only_checks,
             "created_at": review_record.created_at.isoformat(),
         }
 

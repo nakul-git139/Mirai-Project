@@ -22,13 +22,13 @@ Module 09 provides student job application lifecycle tracking and institutional 
 
 ### A. One-Click "Open & Apply" Flow
 1. **Student clicks "Open & Apply"**:
-   - In [JobDiscoveryPage.jsx](file:///Users/nakulmirai/Mirai%20Project/frontend/src/pages/JobDiscoveryPage.jsx) (`handleOpenAndApply`), `window.open(job.url, '_blank')` opens the external application portal in a new browser tab.
+   - In [JobDiscoveryPage.jsx](../../frontend/src/pages/JobDiscoveryPage.jsx) (`handleOpenAndApply`), `window.open(job.url, '_blank')` opens the external application portal in a new browser tab.
    - `setActiveApplyJob(job)` opens the in-app tracking prompt modal.
 2. **Student chooses "Mark as Applied" or "Save to Tracker"**:
-   - `handleLogApplication(status)` calls `api.createApplication` in [api.js](file:///Users/nakulmirai/Mirai%20Project/frontend/src/api.js).
+   - `handleLogApplication(status)` calls `api.createApplication` in [api.js](../../frontend/src/api.js).
    - Dispatches `POST /api/tracker` with `{company, role, link, job_id, status, notes}`.
-   - [routers/tracker.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/routers/tracker.py) (`create_application`):
-     - Validates input via `ApplicationCreate` schema in [schemas.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/schemas.py).
+   - [routers/tracker.py](../../backend/app/routers/tracker.py) (`create_application`):
+     - Validates input via `ApplicationCreate` schema in [schemas.py](../../backend/app/schemas.py).
      - Checks duplicate existence by `job_id` or `(company, role)` under active non-terminal statuses. If existing, raises `HTTPException(409, "Application already logged for this job")`.
      - Creates `Application` model with initial entry in `status_history`: `[{"status": status, "changed_at": iso_time, "note": "Initial application logged"}]`.
      - Returns `ApplicationResponse`.
@@ -36,8 +36,8 @@ Module 09 provides student job application lifecycle tracking and institutional 
 
 ### B. Application Tracker & Movement Detection
 1. **Fetching Applications**:
-   - [ApplicationTrackerPage.jsx](file:///Users/nakulmirai/Mirai%20Project/frontend/src/pages/ApplicationTrackerPage.jsx) invokes `api.getApplications` with query filters (`status`, `has_movement`, `needs_followup`, `followup_days`).
-   - [routers/tracker.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/routers/tracker.py) (`list_applications`):
+   - [ApplicationTrackerPage.jsx](../../frontend/src/pages/ApplicationTrackerPage.jsx) invokes `api.getApplications` with query filters (`status`, `has_movement`, `needs_followup`, `followup_days`).
+   - [routers/tracker.py](../../backend/app/routers/tracker.py) (`list_applications`):
      - Queries `db.query(Application).filter(Application.user_id == current_user.id)`.
      - Evaluates `has_movement`: filters for items with `len(status_history) > 1` or current status in `{"Shortlisted", "Interview", "Offer", "Rejected"}`.
      - Evaluates `needs_followup`: checks if `(now - last_status_change_at).days >= followup_days` and status is not `Offer` or `Rejected`.
@@ -49,22 +49,22 @@ Module 09 provides student job application lifecycle tracking and institutional 
 
 ### C. MSOT Institutional Posting & Eligibility Gating
 1. **Admin Posts Campus Opening**:
-   - Placement officer logs in with role `admin` and opens Admin Postings tab ([AdminJobBoardPage.jsx](file:///Users/nakulmirai/Mirai%20Project/frontend/src/pages/AdminJobBoardPage.jsx)).
+   - Placement officer logs in with role `admin` and opens Admin Postings tab ([AdminJobBoardPage.jsx](../../frontend/src/pages/AdminJobBoardPage.jsx)).
    - Enters role details and eligibility criteria: `min_readiness_score`, `required_skills`, `target_roles`, and `is_pinned`.
    - Calls `POST /api/admin/jobs`.
-   - [routers/admin.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/routers/admin.py) (`create_admin_job`):
+   - [routers/admin.py](../../backend/app/routers/admin.py) (`create_admin_job`):
      - Enforces `require_admin` dependency; student users receive `HTTP 403 Forbidden`.
      - Persists `Job` model with `job_type`, `eligibility_criteria`, `is_pinned=True`, and `posted_by=current_admin.id`.
 2. **Student Job Feed Discovery with Pinning**:
-   - When a student requests `GET /api/jobs/discover`, [routers/jobs.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/routers/jobs.py) passes their skills, target roles, and latest readiness score to `job_discovery_service.discover_jobs()`.
-   - In [discovery_service.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/job_discovery/discovery_service.py) (`check_job_eligibility`):
+   - When a student requests `GET /api/jobs/discover`, [routers/jobs.py](../../backend/app/routers/jobs.py) passes their skills, target roles, and latest readiness score to `job_discovery_service.discover_jobs()`.
+   - In [discovery_service.py](../../backend/app/services/job_discovery/discovery_service.py) (`check_job_eligibility`):
      - **Score Gate**: Verifies `student_score >= min_readiness_score`.
      - **Skills Gate**: Verifies student possesses all required skills (case-insensitive).
      - **Role Gate**: Verifies overlap between student target roles and job target roles.
      - Ineligible students are excluded; the institutional job is omitted from their feed.
      - For eligible students, the job is attached with `source="msot_direct"`, `is_pinned=True`, and sorted to the top index of the feed ahead of public listings.
 3. **Admin Applicant Management & Progression**:
-   - Admin views candidates via `GET /api/admin/jobs/{id}/applicants` in [routers/admin.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/routers/admin.py) (`get_job_applicants`).
+   - Admin views candidates via `GET /api/admin/jobs/{id}/applicants` in [routers/admin.py](../../backend/app/routers/admin.py) (`get_job_applicants`).
    - Admin updates applicant status to `Interview` via `PATCH /api/admin/jobs/{id}/applicants/{app_id}/status` (`update_applicant_status`).
    - Updates student's `Application.status`, refreshes `last_status_change_at`, appends to `status_history`, and logs note `"Status updated by MSOT Placement Admin"`.
    - Student refreshes tracker or filters by "Has Movement": the application immediately reflects the promoted `Interview` stage.

@@ -67,15 +67,15 @@ React UI (frontend/src/pages/GitHubReviewTab.jsx)
 
 | Component | File Path | Key Functions / Classes |
 | :--- | :--- | :--- |
-| **API Router** | [backend/app/routers/github_review.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/routers/github_review.py) | `trigger_github_review`, `get_latest_github_review`, `trigger_live_link_check`, `get_screenshot` |
-| **Review Orchestrator** | [backend/app/services/github_reviewer.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/github_reviewer.py) | `evaluate_github_and_live`, `perform_llm_code_review`, `WEIGHTS` |
-| **GitHub REST Client** | [backend/app/services/github_scanner.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/github_scanner.py) | `GitHubScanner`, `check_response_rate_limit`, `parse_github_repo_url`, `GitHubRateLimitError`, `GitHubNotFoundError` |
-| **Secret Scanner** | [backend/app/services/secret_scanner.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/secret_scanner.py) | `scan_repository_files`, `scan_file_content`, `SECRET_PATTERNS`, `mask_secret` |
-| **Live Link Checker** | [backend/app/services/live_link_checker.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/live_link_checker.py) | `check_live_link`, `SCREENSHOT_DIR` |
-| **Pydantic Schemas** | [backend/app/schemas.py](file:///Users/nakulmirai/Mirai%20Project/backend/app/schemas.py) | `GitHubReviewRequest`, `GitHubReviewResponse`, `LiveLinkCheckRequest`, `ReviewCheck` |
-| **Frontend UI** | [frontend/src/pages/GitHubReviewTab.jsx](file:///Users/nakulmirai/Mirai%20Project/frontend/src/pages/GitHubReviewTab.jsx) | `GitHubReviewTab`, `handleRunReview`, `getScoreBadge` |
-| **Frontend Parent** | [frontend/src/pages/ResumeReviewPage.jsx](file:///Users/nakulmirai/Mirai%20Project/frontend/src/pages/ResumeReviewPage.jsx) | `subtab-github`, tab switching logic |
-| **API Client** | [frontend/src/api.js](file:///Users/nakulmirai/Mirai%20Project/frontend/src/api.js) | `api.triggerGitHubReview`, `api.getLatestGitHubReview`, `api.checkLiveLink`, `api.getScreenshotUrl` |
+| **API Router** | [backend/app/routers/github_review.py](../../backend/app/routers/github_review.py) | `trigger_github_review`, `get_latest_github_review`, `trigger_live_link_check`, `get_screenshot` |
+| **Review Orchestrator** | [backend/app/services/github_reviewer.py](../../backend/app/services/github_reviewer.py) | `evaluate_github_and_live`, `perform_llm_code_review`, `WEIGHTS` |
+| **GitHub REST Client** | [backend/app/services/github_scanner.py](../../backend/app/services/github_scanner.py) | `GitHubScanner`, `check_response_rate_limit`, `parse_github_repo_url`, `GitHubRateLimitError`, `GitHubNotFoundError` |
+| **Secret Scanner** | [backend/app/services/secret_scanner.py](../../backend/app/services/secret_scanner.py) | `scan_repository_files`, `scan_file_content`, `SECRET_PATTERNS`, `mask_secret` |
+| **Live Link Checker** | [backend/app/services/live_link_checker.py](../../backend/app/services/live_link_checker.py) | `check_live_link`, `SCREENSHOT_DIR` |
+| **Pydantic Schemas** | [backend/app/schemas.py](../../backend/app/schemas.py) | `GitHubReviewRequest`, `GitHubReviewResponse`, `LiveLinkCheckRequest`, `ReviewCheck` |
+| **Frontend UI** | [frontend/src/pages/GitHubReviewTab.jsx](../../frontend/src/pages/GitHubReviewTab.jsx) | `GitHubReviewTab`, `handleRunReview`, `getScoreBadge` |
+| **Frontend Parent** | [frontend/src/pages/ResumeReviewPage.jsx](../../frontend/src/pages/ResumeReviewPage.jsx) | `subtab-github`, tab switching logic |
+| **API Client** | [frontend/src/api.js](../../frontend/src/api.js) | `api.triggerGitHubReview`, `api.getLatestGitHubReview`, `api.checkLiveLink`, `api.getScreenshotUrl` |
 
 ---
 

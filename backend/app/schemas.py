@@ -60,6 +60,8 @@ class SettingsResponse(BaseModel):
     enable_mock_interview: bool = False
     concurrency_limits: Dict[str, int] = Field(default_factory=dict)
     rate_limit_reviews_per_hour: int = 10
+    env_forced: bool = False
+    env_forced_provider: Optional[str] = None
 
 
 # ---------------- Background Job Schemas ----------------
@@ -74,6 +76,7 @@ class BackgroundJobResponse(BaseModel):
     user_id: int
     task_type: str
     provider: str
+    model: Optional[str] = None
     status: str  # queued, running, done, failed
     queue_position: Optional[int] = None
     result: Optional[Dict[str, Any]] = None
@@ -91,6 +94,18 @@ class AdminQueueStatusResponse(BaseModel):
     running_jobs: List[Dict[str, Any]]
     queued_jobs: List[Dict[str, Any]]
     recent_timings: List[Dict[str, Any]]
+
+
+class CancelJobResponse(BaseModel):
+    id: str
+    status: str = "cancelled"
+    message: str
+
+
+class CancelAllJobsResponse(BaseModel):
+    cancelled_count: int
+    cancelled_job_ids: List[str]
+    message: str
 
 
 class ConnectionTestRequest(BaseModel):
@@ -259,6 +274,8 @@ class BenchmarkReview(BaseModel):
     score: int = Field(ge=0, le=100)
     summary: str
     checks: List[ReviewCheck]
+    reviewed_with: Optional[str] = None
+    code_only_checks: Optional[List[int]] = None
 
 
 class ResumeReviewResponse(BaseModel):
@@ -268,6 +285,8 @@ class ResumeReviewResponse(BaseModel):
     score: int = Field(ge=0, le=100)
     summary: str
     checks: List[ReviewCheck]
+    reviewed_with: Optional[str] = None
+    code_only_checks: Optional[List[int]] = None
     created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)

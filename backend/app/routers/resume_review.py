@@ -180,6 +180,11 @@ async def trigger_resume_review_async(
             },
             headers={"Retry-After": str(rle.retry_after)},
         )
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(ve),
+        )
 
     job_queue_service.enqueue_and_dispatch(job.id, run_resume_review, job.provider)
     pos = job_queue_service.calculate_queue_position(job.id, job.provider, db)
@@ -189,6 +194,7 @@ async def trigger_resume_review_async(
         user_id=job.user_id,
         task_type=job.task_type,
         provider=job.provider,
+        model=job.model,
         status=job.status,
         queue_position=pos,
         result=job.result,
@@ -219,6 +225,7 @@ def get_latest_resume_review(
             detail="No resume review found. Please upload a resume and run a review first.",
         )
 
+    rewrites = latest_review.rewrites or {}
     return ResumeReviewResponse(
         id=latest_review.id,
         user_id=latest_review.user_id,
@@ -226,6 +233,8 @@ def get_latest_resume_review(
         score=latest_review.score,
         summary=latest_review.summary,
         checks=latest_review.checks,
+        reviewed_with=rewrites.get("reviewed_with"),
+        code_only_checks=rewrites.get("code_only_checks", [1, 2, 3, 4, 5, 6, 7, 8]),
         created_at=latest_review.created_at,
     )
 

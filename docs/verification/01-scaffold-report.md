@@ -18,9 +18,9 @@ make test
 Running all backend tests with pytest...
 backend/venv/bin/pytest -v
 ============================= test session starts ==============================
-platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/nakulmirai/Mirai Project/backend/venv/bin/python3
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- backend/venv/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project
+rootdir: .
 configfile: pytest.ini
 testpaths: backend/tests
 plugins: anyio-4.12.1, asyncio-1.2.0
@@ -104,7 +104,7 @@ Admin token against /api/admin/jobs HTTP status: 200
 6. Refreshed the browser (`location.reload()`); verified `Ollama (Local)` and `smollm:135m` persisted in the form inputs.
 7. Clicked "Test Connection"; verified the result card returned `Connection Verified Successfully`.
 8. Recording video saved to:
-   `/Users/nakulmirai/.gemini/antigravity-ide/brain/dfbab056-9078-4033-b017-52b8d9529a7d/frontend_verification_1792045803872.webp`
+   `artifacts/verification_flow.webp`
 
 **Result**: PASSED.
 

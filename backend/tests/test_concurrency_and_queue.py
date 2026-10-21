@@ -175,7 +175,8 @@ def test_ollama_concurrency_limit_and_queue_positions(test_users):
         execution_order.append(num)
         return {"result": f"done-{num}"}
 
-    with patch.object(job_queue_service, "check_student_rate_limit", return_value=None):
+    with patch.object(job_queue_service, "check_student_rate_limit", return_value=None), \
+         patch("app.services.settings_service.check_ollama_connectivity", return_value=(True, "")):
         job_ids = []
         with SessionLocal() as db:
             for i in range(1, 6):
@@ -290,7 +291,8 @@ def test_failure_paths_and_queue_resilience(test_users):
     def successful_subsequent_task(payload: dict) -> dict:
         return {"status": "recovered_successfully"}
 
-    with patch.object(job_queue_service, "check_student_rate_limit", return_value=None):
+    with patch.object(job_queue_service, "check_student_rate_limit", return_value=None), \
+         patch("app.services.settings_service.check_ollama_connectivity", return_value=(True, "")):
         with SessionLocal() as db:
             job_fail = job_queue_service.create_job(user_id=user_id, task_type="job_match", payload={}, provider="ollama", db=db)
             job_succ = job_queue_service.create_job(user_id=user_id, task_type="job_match", payload={}, provider="ollama", db=db)

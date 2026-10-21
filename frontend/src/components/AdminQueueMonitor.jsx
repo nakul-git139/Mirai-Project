@@ -20,6 +20,17 @@ export default function AdminQueueMonitor() {
     }
   };
 
+  const handleCancelJob = async (jobId) => {
+    if (!window.confirm(`Are you sure you want to cancel job ${jobId}?`)) return;
+    try {
+      await api.cancelJob(jobId);
+      await loadQueueStatus();
+    } catch (err) {
+      setError(err.message || "Failed to cancel job.");
+    }
+  };
+
+
   useEffect(() => {
     loadQueueStatus();
     if (!autoRefresh) return;
@@ -156,6 +167,7 @@ export default function AdminQueueMonitor() {
                   <th className="p-3">Provider</th>
                   <th className="p-3">Elapsed</th>
                   <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800 text-slate-300">
@@ -177,6 +189,14 @@ export default function AdminQueueMonitor() {
                         <RotateCw className="w-3 h-3 animate-spin" />
                         <span>Running</span>
                       </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => handleCancelJob(j.job_id)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -210,6 +230,7 @@ export default function AdminQueueMonitor() {
                   <th className="p-3">Task</th>
                   <th className="p-3">Provider</th>
                   <th className="p-3">Waiting Time</th>
+                  <th className="p-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800 text-slate-300">
@@ -225,6 +246,14 @@ export default function AdminQueueMonitor() {
                       </span>
                     </td>
                     <td className="p-3 font-mono text-slate-400 tabular-nums">{j.wait_seconds}s</td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => handleCancelJob(j.job_id)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

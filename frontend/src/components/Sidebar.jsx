@@ -10,8 +10,10 @@ import {
   ShieldCheck,
   LogOut,
   LogIn,
-  Bot
+  Bot,
+  RotateCw,
 } from 'lucide-react';
+import { useJobContext } from '../context/JobContext';
 
 const NAV_ITEMS = [
   { id: 'chat', label: 'Copilot Chat', icon: Bot },
@@ -32,6 +34,7 @@ export default function Sidebar({
   onOpenAuth,
   enableMockInterview = false,
 }) {
+  const { activeJob, elapsed } = useJobContext();
   const isAdmin = currentUser?.role === 'admin';
   const visibleNavItems = NAV_ITEMS.filter(
     (item) => item.id !== 'interview' || enableMockInterview
@@ -89,6 +92,36 @@ export default function Sidebar({
           )}
         </nav>
       </div>
+
+      {/* Global Running Job Mini Indicator */}
+      {activeJob && (activeJob.status === 'running' || activeJob.status === 'queued') && (
+        <div
+          id="sidebar-active-job-indicator"
+          onClick={() => onSelectTab('reviews')}
+          className="mx-3 mb-2 p-3 rounded-2xl bg-blue-950/70 border border-blue-500/40 text-blue-200 cursor-pointer hover:bg-blue-900/60 transition-all shadow-lg animate-in fade-in"
+          title="Click to view running review"
+        >
+          <div className="flex items-center justify-between text-xs font-semibold">
+            <div className="flex items-center gap-1.5 truncate">
+              <RotateCw className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />
+              <span className="truncate">
+                {activeJob.task_type === 'resume_review' ? 'Resume Review' : activeJob.task_type}
+              </span>
+            </div>
+            <span className="font-mono text-xs text-blue-300 font-bold tabular-nums">
+              {elapsed.toFixed(1)}s
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5">
+            <span className="uppercase font-mono text-[10px] tracking-wider px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              {activeJob.status}
+            </span>
+            <span className="font-mono text-slate-300 text-[10px]">
+              {activeJob.provider}{activeJob.model ? ` / ${activeJob.model}` : ''}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* User Footer */}
       <div className="p-4 border-t border-slate-800 bg-slate-950/60">

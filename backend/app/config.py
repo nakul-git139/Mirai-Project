@@ -111,3 +111,7 @@ DEFAULT_CONCURRENCY_LIMITS = {
 # Per-Student Rate Limiting
 DEFAULT_RATE_LIMIT_REVIEWS_PER_HOUR: int = int(os.environ.get("RATE_LIMIT_REVIEWS_PER_HOUR", "10"))
 DEFAULT_RATE_LIMIT_WINDOW_SECONDS: int = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "3600"))
+
+# Per-Job Maximum Execution Run Time (Safety Net Watchdog)
+DEFAULT_JOB_MAX_RUN_TIME_SECONDS: int = int(os.environ.get("JOB_MAX_RUN_TIME_SECONDS", "300"))
+

@@ -70,6 +70,8 @@ export default function SettingsPage({ onSettingsUpdated }) {
   });
 
   const [defaultModels, setDefaultModels] = useState({});
+  const [envForced, setEnvForced] = useState(false);
+  const [envForcedProvider, setEnvForcedProvider] = useState(null);
 
   useEffect(() => {
     loadSettings();
@@ -82,6 +84,8 @@ export default function SettingsPage({ onSettingsUpdated }) {
       setProvider(data.provider || 'ollama');
       setModel(data.model || 'llama3.2');
       setOllamaBaseUrl(data.ollama_base_url || 'http://localhost:11434');
+      setEnvForced(Boolean(data.env_forced));
+      setEnvForcedProvider(data.env_forced_provider || null);
       setKeyStatus({
         has_openai_key: data.has_openai_key,
         has_claude_key: data.has_claude_key,
@@ -201,6 +205,28 @@ export default function SettingsPage({ onSettingsUpdated }) {
               <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
             )}
             <span>{toast.message}</span>
+          </div>
+        )}
+
+        {/* Environment Variable Override Banner */}
+        {envForced && (
+          <div
+            id="env-forced-provider-alert"
+            className="p-4 rounded-xl border border-amber-500/50 bg-amber-500/10 text-amber-200 text-sm flex items-start space-x-3 shadow-lg"
+          >
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-amber-100">
+                Provider forced by environment variable LLM_PROVIDER
+              </p>
+              <p className="text-xs text-amber-300/80 mt-1 leading-relaxed">
+                The application runtime is currently forced to use provider{' '}
+                <span className="font-mono bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-200 font-bold uppercase">
+                  {envForcedProvider}
+                </span>{' '}
+                via system environment variable <code className="font-mono text-amber-200">LLM_PROVIDER</code>. Stored settings will take effect once this environment variable is removed.
+              </p>
+            </div>
           </div>
         )}
 

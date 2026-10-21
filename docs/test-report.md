@@ -52,7 +52,7 @@
 - **Command**: `make test`
 - **Output**: 36 passed in 1.46s
 - **Coverage**:
-  - Deterministic 8-point rubric benchmark checks implementation ([docs/benchmarks.md](file:///Users/nakulmirai/Mirai%20Project/docs/benchmarks.md))
+  - Deterministic 8-point rubric benchmark checks implementation ([docs/benchmarks.md](benchmarks.md))
   - Single-page format enforcement (`CHK-PAGE-COUNT`, 15 pts)
   - Clean visual layout & typography evaluation with heuristic fallback (`CHK-VISUAL-LAYOUT`, 10 pts)
   - Zero spelling & grammar mistakes check with precise typo dictionary (`CHK-SPELL-GRAMMAR`, 10 pts)
@@ -75,7 +75,7 @@
 - **Command**: `backend/venv/bin/pytest -v`
 - **Output**: 42 passed in 1.96s
 - **Coverage**:
-  - LinkedIn benchmark specification added to [docs/benchmarks.md](file:///Users/nakulmirai/Mirai%20Project/docs/benchmarks.md) (Section 5–9)
+  - LinkedIn benchmark specification added to [docs/benchmarks.md](benchmarks.md) (Section 5–9)
   - Profile photo presence check via PDF image stream / profile metadata (`CHK-LI-PHOTO`, 10 pts)
   - Specific headline check with 220-character LinkedIn hard limit enforcement and generic pattern rejection (`CHK-LI-HEADLINE`, 20 pts)
   - Substantive About section check requiring >= 150 characters and >= 30 words with structured background and focus (`CHK-LI-ABOUT`, 20 pts)
@@ -96,7 +96,7 @@
 - **Command**: `make test`
 - **Output**: 52 passed in 11.41s
 - **Coverage**:
-  - GitHub codebase and live link benchmark specification added to [docs/benchmarks.md](file:///Users/nakulmirai/Mirai%20Project/docs/benchmarks.md) (Sections 10–14)
+  - GitHub codebase and live link benchmark specification added to [docs/benchmarks.md](benchmarks.md) (Sections 10–14)
   - Profile README check via GitHub REST API (`CHK-GH-PROFILE-README`, 5 pts)
   - Pinned / featured repositories check (`CHK-GH-PINNED-REPOS`, 5 pts)
   - Regular public commit events and momentum tracking over 90 days (`CHK-GH-COMMIT-ACTIVITY`, 10 pts)
@@ -401,7 +401,7 @@
 | **3. Job Discovery & Ranking** | `tests/test_job_matching.py`<br>`backend/tests/test_jobs.py` | • Multi-profile ranking: Frontend student matched React/Next.js (92%), Backend matched Python/Go (88%), Data Scientist matched PyTorch/Pandas (90%).<br>• Deduplication: Retained single richer record across Greenhouse, Lever, and RSS feeds. In-memory TTL cache eliminates external stampedes with `asyncio.Lock`. | **PASSED** |
 | **4. Application Tracker & MSOT E2E** | `tests/test_tracker_msot_e2e.py`<br>`backend/tests/test_browser_tracker_flow.py` (`make test-e2e`) | • 5-step dual-session Playwright browser flow verified:<br>  1. Admin posted restricted campus opening with readiness gate ($\ge 70$).<br>  2. Ineligible student filtered out.<br>  3. Eligible student viewed pinned job, applied via 1-click, card appeared in Kanban & Table.<br>  4. Admin triaged candidate and promoted to 'Interview'.<br>  5. Student verified movement tag and status transition history. | **PASSED** (52.69s) |
 | **5. Privacy, Deletion & Secrets** | `tests/test_privacy_deletion.py`<br>`backend/tests/test_profile.py`<br>Git History Audit Script | • Consent gate blocks unconsented access (HTTP 400).<br>• Profile data wipe physically unlinks resume files from `backend/data/uploads/`.<br>• Account deletion cascades across all DB tables and unlinks all screenshots.<br>• Tenant isolation verified: Student A receives HTTP 403 on Student B's data.<br>• Git scan verified: 0 `.env` files, 0 real resumes, 0 committed API keys across full history. | **PASSED** |
-| **6. LLM Background Queue & Limits** | `backend/tests/test_concurrency_and_queue.py`<br>`backend/app/services/job_queue.py`<br>Report: [13-background-jobs-concurrency-ratelimits-report.md](file:///Users/nakulmirai/Mirai%20Project/docs/verification/13-background-jobs-concurrency-ratelimits-report.md) | • Non-blocking `ThreadPoolExecutor` returns immediate HTTP 202 with `job_id` and FIFO queue position.<br>• Provider semaphores enforced: Ollama = 1 (sequential queue), Hosted/Mock = 10.<br>• Sliding-window rate limit: 10 reviews/hour with HTTP 429 and `Retry-After: 3600`.<br>• Remote Ollama verified: 5 concurrent resume reviews executed sequentially in 17.16s.<br>• Verification Report: `docs/verification/13-background-jobs-concurrency-ratelimits-report.md`. | **PASSED** |
+| **6. LLM Background Queue & Limits** | `backend/tests/test_concurrency_and_queue.py`<br>`backend/app/services/job_queue.py`<br>Report: [13-background-jobs-concurrency-ratelimits-report.md](verification/13-background-jobs-concurrency-ratelimits-report.md) | • Non-blocking `ThreadPoolExecutor` returns immediate HTTP 202 with `job_id` and FIFO queue position.<br>• Provider semaphores enforced: Ollama = 1 (sequential queue), Hosted/Mock = 10.<br>• Sliding-window rate limit: 10 reviews/hour with HTTP 429 and `Retry-After: 3600`.<br>• Remote Ollama verified: 5 concurrent resume reviews executed sequentially in 17.16s.<br>• Verification Report: `docs/verification/13-background-jobs-concurrency-ratelimits-report.md`. | **PASSED** |
 | **7. Server Concurrency Load Test** | `tests/locustfile.py`<br>Locust 125-User Headless Runner | • **Read-Only Endpoints**: Simulated 125 concurrent users over 30s against Mock LLM (3,499 requests, 0% errors, 118 req/s, p50: 3ms, p95: 18ms). *Note: Earlier numbers covered read endpoints only.*<br>• **Review Queue Submissions**: 125 concurrent students submitted resume reviews through the job queue with Mock LLM sleeping 1.0s and concurrency limit = 10. Total 9,825 requests (125 reviews + 9,700 status polls), **0.00% error rate**.<br>  - Submit latency (`POST /api/jobs/trigger`): p50 = **49 ms**, p95 = **94 ms**.<br>  - Queue wait time: p50 = **11.1 ms**, p95 = **1,233.6 ms** (1.23 s).<br>  - Total completion time: p50 = **1,019.6 ms** (1.02 s), p95 = **2,045.1 ms** (2.05 s). | **PASSED** |
 
 ---
@@ -487,6 +487,51 @@ While all automated tests, Playwright browser sessions, and Locust load tests ha
 - **Full Test Suite Execution (`make test`)**:
   - Command: `make test`
   - Real output: `130 passed, 1 skipped, 4 deselected, 5 warnings in 74.12s (0:01:14)`. Zero failures, zero regressions.
+
+---
+
+## [2026-10-20] Module 15: Cooperative Job Cancellation & Worker Safety Nets
+- **Commands & Results**:
+  - `backend/venv/bin/pytest backend/tests/test_job_cancellation.py -v -m "not live"`: **5 passed, 1 deselected in 2.14s**
+  - `backend/venv/bin/pytest backend/tests/test_job_cancellation.py::test_live_remote_ollama_cancellation_and_resumption -v -s -o addopts=""`: **1 passed in 15.96s** (executed against remote host `http://10.134.74.156:11434` with model `qwen2.5:3b`)
+  - `make test`: **136 passed, 5 deselected, 7 warnings in 140.95s (0:02:20)** (0 failures, 0 regressions)
+- **Coverage**:
+  - Cancellation of queued jobs deleting them from schedule and updating remaining queue positions (#1, #2, #3)
+  - Cooperative abort of running jobs releasing provider `threading.Semaphore` concurrency slot within 0.005s (< 1.0s requirement)
+  - Active TCP socket termination of in-flight `httpx.Client` request to remote Ollama server (`http://10.134.74.156:11434`), aborting remote generation
+  - Terminal status `"cancelled"` strictly protected against overwrites by late `"done"` or `"failed"` commits
+  - Student permission checks: Student B blocked from cancelling Student A's job with HTTP 403 Forbidden; Admin permitted with HTTP 200 OK
+  - Student batch cancellation endpoint `POST /api/jobs/my/cancel-all` cancelling all pending jobs
+  - Server boot safety net discovering leftover `queued` or `running` jobs and transitioning them to `failed: interrupted by restart`
+  - Per-job max run time watchdog timer (`JOB_MAX_RUN_TIME_SECONDS`, default 300s) aborting hung jobs, releasing semaphore slots, and marking them failed
+  - Interactive UI flow in `JobProgressIndicator.jsx` with Cancel button, inline confirmation dialog, and `localStorage` cleanup
+  - Admin telemetry view in `AdminQueueMonitor.jsx` with Cancel action buttons on active inference and queued jobs tables
+- **Real End-to-End Checks**:
+  - Live remote Ollama test: Job 1 cancelled during generation at t=+2.71s, slot released immediately, Job 2 completed with status `done` in 13.07s (Score: 100), Job 1 retained status `cancelled`
+  - Full browser verification in React UI: started review, clicked Cancel, verified inline prompt, confirmed cancellation, verified amber "Review Cancelled" card and `localStorage` clearance
+- **Status**: PASSED (0 failures)
+
+---
+
+## [2026-10-20] Module 16: Ollama Queue Resilience, Fail-Fast Preflight & Stateful Progress Tracking
+- **Target Host**: `http://10.134.74.41:11434` (Remote Ollama models: `qwen2.5:3b`, `qwen2.5:7b`)
+- **Commands & Results**:
+  - `make test`: **136 passed, 5 deselected, 7 warnings in 177.31s (0:02:57)** across all 16 modules (0 failures, 0 regressions).
+  - `backend/venv/bin/pytest backend/tests/test_concurrency_and_queue.py -v`: **6 passed in 6.39s**.
+  - `backend/venv/bin/pytest backend/tests/test_job_cancellation.py -v`: **5 passed in 7.15s**.
+  - `backend/venv/bin/pytest backend/tests/test_browser_tracker_flow.py -v`: **1 passed in 54.72s**.
+  - Frontend production build: `npm run build` compiled cleanly in 567ms.
+- **Coverage**:
+  - Preflight Fail-Fast Validation: `create_job()` performs a 1.5-second preflight socket check against Ollama `/api/tags`; unreachable hosts or invalid URLs are immediately rejected with `HTTP 400 Bad Request` in 1.52s without persisting ghost jobs or locking semaphore slots.
+  - Environment Variable Precedence Transparency: `GET /api/settings` returns `env_forced` and `env_forced_provider`. When `LLM_PROVIDER` is active, Settings UI renders a persistent amber alert banner informing students that environment overrides take priority.
+  - Recursive Lock Deadlock Elimination: `JobExecutionHandle` and `JobQueueService` locks upgraded to `threading.RLock()`, preventing recursive re-entrant deadlocks during worker semaphore acquisition.
+  - Startup Cleanup Process Boot Scoping: Startup stale job cleanup scoped by `BackgroundJob.created_at <= self._boot_time`, preventing test client fixtures from accidentally terminating in-flight jobs.
+  - Real Remote Ollama Resume Benchmark Review: Triggered live review against `http://10.134.74.41:11434` (`qwen2.5:3b`); completed in 11.1s (timing log entry #303: 10.66s, 135 prompt tokens, 37 output tokens); response metadata explicitly reports `reviewed_with: "ollama / qwen2.5:3b"` and notes that checks 1–8 were evaluated deterministically in code.
+  - Stateful Progress & Continuous Elapsed Timer: Shifted elapsed calculation to server timestamps (`started_at || created_at`). Global `JobContext.jsx` and `Sidebar.jsx` mini-widget maintain elapsed time across tab switching (Profile -> Jobs -> Resume Review) and page reloads without resetting to 0s.
+  - Playwright Browser Automation: Automated headless Playwright script verified full registration, consent intake, PDF upload, timer continuity across 3 navigation transitions, metadata banner rendering, and page reload recovery.
+- **Status**: PASSED (0 failures, 136 tests passing)
+
+
 
 
 

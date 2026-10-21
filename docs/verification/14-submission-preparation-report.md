@@ -11,7 +11,7 @@ backend/venv/bin/pytest tests/ -v
 ============================= test session starts ==============================
 platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- backend/venv/bin/python3.11
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project
+rootdir: .
 configfile: pytest.ini
 plugins: asyncio-1.4.0, locust-2.46.7, anyio-4.15.1
 collected 10 items
@@ -43,7 +43,7 @@ backend/venv/bin/pytest -v
 ============================= test session starts ==============================
 platform darwin -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- backend/venv/bin/python3.11
 cachedir: .pytest_cache
-rootdir: /Users/nakulmirai/Mirai Project/backend
+rootdir: backend
 configfile: pytest.ini
 plugins: asyncio-1.4.0, locust-2.46.7, anyio-4.15.1
 collected 133 items / 4 deselected / 129 selected
@@ -82,7 +82,7 @@ make test-e2e
 Starting isolated E2E Playwright test runner...
 ==========================================================
  Starting Isolated E2E Playwright Flow
- Temporary Test Database: /Users/nakulmirai/Mirai Project/backend/data/test_e2e.db
+ Temporary Test Database: backend/data/test_e2e.db
 ==========================================================
 Waiting for backend on http://127.0.0.1:8000/api/health...
 Backend is ready.
@@ -115,7 +115,7 @@ PASSED
 
 ======================== 1 passed, 5 warnings in 52.69s ========================
 Shutting down test servers...
-Isolated test database wiped (/Users/nakulmirai/Mirai Project/backend/data/test_e2e.db*).
+Isolated test database wiped (backend/data/test_e2e.db*).
 ```
 
 ---

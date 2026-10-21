@@ -22,6 +22,7 @@ import LinkedInReviewTab from './LinkedInReviewTab';
 import GitHubReviewTab from './GitHubReviewTab';
 import OllamaProgressIndicator from '../components/OllamaProgressIndicator';
 import JobProgressIndicator from '../components/JobProgressIndicator';
+import { useJobContext } from '../context/JobContext';
 
 function LinkedinIcon({ className = "w-4 h-4" }) {
   return (
@@ -46,27 +47,33 @@ function GitHubIcon({ className = "w-4 h-4" }) {
 
 
 export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
+  const { activeJob, activeJobId: ctxJobId, startTrackingJob, clearActiveJob } = useJobContext();
   const [activeSubTab, setActiveSubTab] = useState('resume'); // resume, linkedin
   const [review, setReview] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [runningReview, setRunningReview] = useState(false);
-  const [activeJobId, setActiveJobId] = useState(() => localStorage.getItem('active_job_resume_review') || null);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all'); // all, failed, passed
   const [previewOpen, setPreviewOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
   const [previewTimestamp, setPreviewTimestamp] = useState(Date.now());
 
+  const isResumeJobRunning = Boolean(
+    activeJob &&
+    activeJob.task_type === 'resume_review' &&
+    (activeJob.status === 'queued' || activeJob.status === 'running')
+  );
+  const currentResumeJobId = isResumeJobRunning ? activeJob.id : ctxJobId;
 
   useEffect(() => {
     loadReview();
-    // Check if there is an existing active job from previous session
-    const savedJob = localStorage.getItem('active_job_resume_review');
-    if (savedJob) {
-      setActiveJobId(savedJob);
-      setRunningReview(true);
-    }
   }, [currentUser]);
+
+  useEffect(() => {
+    if (activeJob && activeJob.task_type === 'resume_review' && activeJob.status === 'done' && activeJob.result) {
+      setReview(activeJob.result);
+      setLoading(false);
+    }
+  }, [activeJob?.status, activeJob?.result]);
 
   const loadReview = async () => {
     if (!currentUser) {
@@ -91,20 +98,19 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
   };
 
   const handleRunReview = async (fileToUpload = null) => {
-    setRunningReview(true);
     setError(null);
     try {
       const res = await api.triggerResumeReviewAsync(fileToUpload);
-      setActiveJobId(res.id);
-      localStorage.setItem('active_job_resume_review', res.id);
+      startTrackingJob(res);
     } catch (err) {
       if (err.status === 429) {
         const retry = err.data?.detail?.retry_after || err.data?.retry_after || 60;
         setError(`Rate limit exceeded: Maximum reviews per hour reached. Please retry after ${retry} seconds.`);
       } else {
-        setError(err.message || "Failed to execute resume review.");
+        const msg = err.data?.detail || err.message || "Failed to execute resume review.";
+        setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
       }
-      setRunningReview(false);
+      clearActiveJob();
     }
   };
 
@@ -250,17 +256,17 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
                   accept=".pdf,.docx"
                   className="hidden"
                   onChange={handleFileChange}
-                  disabled={runningReview}
+                  disabled={isResumeJobRunning}
                 />
               </label>
 
               <button
                 onClick={() => handleRunReview()}
-                disabled={runningReview}
+                disabled={isResumeJobRunning}
                 className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-xs font-semibold text-white transition flex items-center gap-2 shadow-lg shadow-blue-500/20 disabled:opacity-50"
               >
-                <RotateCw className={`w-3.5 h-3.5 ${runningReview ? 'animate-spin' : ''}`} />
-                {runningReview ? 'Analyzing...' : 'Re-run Review'}
+                <RotateCw className={`w-3.5 h-3.5 ${isResumeJobRunning ? 'animate-spin' : ''}`} />
+                {isResumeJobRunning ? 'Analyzing...' : 'Re-run Review'}
               </button>
             </>
           )}
@@ -300,27 +306,26 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
             )}
 
             {/* Running Review Background Job Progress Indicator */}
-            {runningReview && activeJobId ? (
+            {isResumeJobRunning && currentResumeJobId ? (
               <JobProgressIndicator
-                jobId={activeJobId}
+                jobId={currentResumeJobId}
                 taskType="resume_review"
                 featureTitle="Resume Benchmark Review"
                 onComplete={(res) => {
                   setReview(res);
-                  setActiveJobId(null);
-                  setRunningReview(false);
+                  clearActiveJob();
                   setPreviewTimestamp(Date.now());
                   setUploadFile(null);
                 }}
                 onError={(err) => {
                   setError(err);
-                  setActiveJobId(null);
-                  setRunningReview(false);
+                  clearActiveJob();
+                }}
+                onCancel={() => {
+                  clearActiveJob();
                 }}
               />
-            ) : runningReview && (
-              <OllamaProgressIndicator featureName="Resume Benchmark Review" />
-            )}
+            ) : null}
 
             {/* Loading Spinner */}
             {loading && (
@@ -331,7 +336,7 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
             )}
 
             {/* No Review State */}
-            {!loading && !review && (
+            {!loading && !review && !isResumeJobRunning && (
               <div className="p-12 rounded-3xl bg-slate-950/60 border border-slate-800 text-center space-y-5 shadow-xl">
                 <div className="w-16 h-16 rounded-3xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto border border-blue-500/20 shadow-inner">
                   <FileText className="w-8 h-8" />
@@ -360,6 +365,26 @@ export default function ResumeReviewPage({ currentUser, onNavigateToProfile }) {
             {/* Scorecard & Review Details */}
             {!loading && review && (
               <>
+                {/* Review Engine & Model Metadata Banner */}
+                <div
+                  id="resume-review-metadata-banner"
+                  className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 shadow-md animate-in fade-in"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="font-semibold text-white">
+                      Reviewed with:{' '}
+                      <span className="font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        {review.reviewed_with || 'ollama / qwen2.5:3b'}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-400 text-[11px]">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    <span>8 benchmark checks evaluated in code (deterministic), placement summary via LLM</span>
+                  </div>
+                </div>
+
                 {/* Top Scorecard Widget */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Score Dial / Ring Card */}

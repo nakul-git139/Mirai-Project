@@ -68,18 +68,18 @@ sequenceDiagram
 
 ### Exact Files and Functions:
 1. `backend/app/models.py`:
-   - [BackgroundJob](file:///Users/nakulmirai/Mirai%20Project/backend/app/models.py#L125-L148): Stores `id`, `user_id`, `task_type`, `provider`, `status` (`queued`, `running`, `done`, `failed`), `payload` (JSON), `result` (JSON), `error_message`, `created_at`, `started_at`, `completed_at`.
+   - [BackgroundJob](../../backend/app/models.py#L125-L148): Stores `id`, `user_id`, `task_type`, `provider`, `status` (`queued`, `running`, `done`, `failed`), `payload` (JSON), `result` (JSON), `error_message`, `created_at`, `started_at`, `completed_at`.
 2. `backend/app/config.py`:
-   - [DEFAULT_CONCURRENCY_LIMITS](file:///Users/nakulmirai/Mirai%20Project/backend/app/config.py#L30-L36): Provider concurrency defaults (`ollama`: 1, `openai`: 10, `claude`: 10, `gemini`: 10, `mock`: 10).
-   - [DEFAULT_RATE_LIMIT_REVIEWS_PER_HOUR](file:///Users/nakulmirai/Mirai%20Project/backend/app/config.py#L39-L40): 10 reviews/hour.
-   - [DEFAULT_LLM_PROVIDER](file:///Users/nakulmirai/Mirai%20Project/backend/app/config.py#L26-L27): Defaults to `ollama`.
+   - [DEFAULT_CONCURRENCY_LIMITS](../../backend/app/config.py#L30-L36): Provider concurrency defaults (`ollama`: 1, `openai`: 10, `claude`: 10, `gemini`: 10, `mock`: 10).
+   - [DEFAULT_RATE_LIMIT_REVIEWS_PER_HOUR](../../backend/app/config.py#L39-L40): 10 reviews/hour.
+   - [DEFAULT_LLM_PROVIDER](../../backend/app/config.py#L26-L27): Defaults to `ollama`.
 3. `backend/app/services/job_queue.py`:
-   - [JobQueueService.create_job](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/job_queue.py#L137-L180): Persists new queued job after validating student hourly quota.
-   - [JobQueueService.check_student_rate_limit](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/job_queue.py#L86-L115): Computes sliding-window usage over the past 3600 seconds; raises `RateLimitExceededError` if exceeded.
-   - [JobQueueService.calculate_queue_position](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/job_queue.py#L117-L135): Dynamically counts pending queued jobs for the target provider created prior to the current job.
-   - [JobQueueService.enqueue_and_dispatch](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/job_queue.py#L184-L194): Submits task to Python's `ThreadPoolExecutor`.
-   - [JobQueueService._worker_thread](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/job_queue.py#L196-L257): Acquires provider semaphore, records start, runs synchronous task, updates status to `done` or `failed`, catches errors with user-friendly formatting, and safely releases semaphore in `finally`.
-   - [JobQueueService.get_admin_queue_status](file:///Users/nakulmirai/Mirai%20Project/backend/app/services/job_queue.py#L259-L340): Assembles real-time queue lengths, running jobs, limits, and latency logs for admins.
+   - [JobQueueService.create_job](../../backend/app/services/job_queue.py#L137-L180): Persists new queued job after validating student hourly quota.
+   - [JobQueueService.check_student_rate_limit](../../backend/app/services/job_queue.py#L86-L115): Computes sliding-window usage over the past 3600 seconds; raises `RateLimitExceededError` if exceeded.
+   - [JobQueueService.calculate_queue_position](../../backend/app/services/job_queue.py#L117-L135): Dynamically counts pending queued jobs for the target provider created prior to the current job.
+   - [JobQueueService.enqueue_and_dispatch](../../backend/app/services/job_queue.py#L184-L194): Submits task to Python's `ThreadPoolExecutor`.
+   - [JobQueueService._worker_thread](../../backend/app/services/job_queue.py#L196-L257): Acquires provider semaphore, records start, runs synchronous task, updates status to `done` or `failed`, catches errors with user-friendly formatting, and safely releases semaphore in `finally`.
+   - [JobQueueService.get_admin_queue_status](../../backend/app/services/job_queue.py#L259-L340): Assembles real-time queue lengths, running jobs, limits, and latency logs for admins.
 4. `backend/app/services/job_dispatchers.py`:
    - Task execution handlers for `run_resume_review`, `run_linkedin_review`, `run_github_review`, `run_live_link_check`, and `run_job_match`.
 5. `backend/app/routers/background_jobs.py`:
@@ -166,3 +166,21 @@ Total Wall Clock Duration: ~17s
 2. Navigate to `http://localhost:5173` and log in as `admin@msot.edu` (password `admin123`).
 3. Click "Job Board" in the sidebar, then click the **"LLM Queue & System Health"** tab.
 4. Verify the 4 KPI cards (Total Queued Jobs, In-Flight Inference Jobs, Ollama Concurrency Limit = 1, Hosted API Concurrency = 10), the Active Inference Jobs table, Queued Jobs table, and Recent LLM Latency logs.
+
+---
+
+## Changes (2026-10-20) - Cooperative Job Cancellation & Worker Safety Nets
+- **Job Cancellation Engine**:
+  - Implemented `JobExecutionHandle` tracking semaphore acquisition, cancellation event, active HTTP client, and abort callbacks.
+  - Added `cancel_job(job_id, current_user)`: Cancelling queued jobs deletes them from the execution schedule and dynamically updates queue positions; cancelling running jobs calls `handle.cancel()`, terminating the active `httpx.Client` to remote Ollama (`http://10.134.74.156:11434`) and immediately releasing the provider's concurrency semaphore slot via idempotent `handle.release_slot()`.
+  - Added batch student cancellation `cancel_all_student_jobs(user_id)`.
+  - Added endpoints `POST /api/jobs/{job_id}/cancel`, `POST /api/jobs/cancel/{job_id}`, and `POST /api/jobs/my/cancel-all`.
+  - Enforced strict tenant isolation: Students can only cancel their own jobs (HTTP 403 otherwise); Admins can cancel any job.
+  - Terminal status `"cancelled"` is strictly protected against being overwritten by late `"done"` or `"failed"` commits from unwinding worker threads.
+- **Worker Safety Nets**:
+  - **Per-Job Max Run Time Watchdog**: Configured `JOB_MAX_RUN_TIME_SECONDS` (default: 300s); jobs exceeding timeout are automatically aborted, their semaphore slots are freed, and they are transitioned to `failed: execution timed out after Ns`.
+  - **Startup Leftover Cleanup**: Server initialization discovery discovers orphaned `queued` or `running` jobs left behind by unexpected crashes or restarts and transitions them to `failed: interrupted by restart`.
+- **Frontend Enhancements**:
+  - `JobProgressIndicator.jsx`: Added Cancel button, inline confirmation dialog ("Cancel this review and release the queue slot? [Yes, Cancel] [Keep Waiting] [Cancel all my jobs]"), styled `"cancelled"` card, and `localStorage` cleanup.
+  - `AdminQueueMonitor.jsx`: Added Cancel action buttons to both Active Inference and Queued Jobs tables.
+

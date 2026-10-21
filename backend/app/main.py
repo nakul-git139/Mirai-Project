@@ -23,6 +23,8 @@ from app.routers import (
     background_jobs,
 )
 
+from app.services.job_queue import job_queue_service
+
 # Set up sensitive data redacting for all loggers
 setup_secure_logging()
 logger = logging.getLogger(__name__)
@@ -36,6 +38,12 @@ app = FastAPI(
     description="Placement Readiness Copilot API for MSOT students",
     version="1.0.0",
 )
+
+
+@app.on_event("startup")
+def on_startup():
+    job_queue_service.cleanup_stale_jobs_on_startup()
+
 
 # Configure CORS for local development
 app.add_middleware(

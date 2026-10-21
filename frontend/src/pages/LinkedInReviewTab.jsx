@@ -287,6 +287,10 @@ export default function LinkedInReviewTab({ currentUser, onNavigateToProfile }) 
             setActiveJobId(null);
             setRunningReview(false);
           }}
+          onCancel={() => {
+            setActiveJobId(null);
+            setRunningReview(false);
+          }}
         />
       ) : runningReview && (
         <OllamaProgressIndicator featureName="LinkedIn Placement Benchmark Review" />
